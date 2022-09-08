@@ -1,0 +1,50 @@
+name: Jira validation reusable workflow
+
+on:
+  workflow_call:
+    inputs:
+      CONTEXT_ENV:
+        description: Dev or Test env
+        required: true
+        type: string
+    secrets:
+      JIRA_BASE_URL:
+        required: true
+      JIRA_USER_EMAIL:
+        required: true
+      JIRA_API_TOKEN:
+        required: true
+
+jobs:
+  validate-ticket:
+    name: Validate Jira ticket
+    runs-on: ubuntu-latest
+    outputs:
+      current_branch: ${{ steps.branch-names.outputs.current_branch }}
+      run_url: ${{ steps.set-run-url.outputs.url }}
+      issue_url: ${{ steps.validate-ticket.outputs.issue_url }}
+      issue_summary: ${{ steps.validate-ticket.outputs.issue_summary }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+      - name: Get branch names
+        id: branch-names
+        uses: tj-actions/branch-names@v5.2
+      - name: Get run url
+        id: set-run-url
+        run: |
+          url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "::set-output name=url::$url"
+      - name: Validate ticket
+        id: validate-ticket
+        env:
+          ISSUE_KEY: ${{ steps.branch-names.outputs.current_branch }}
+          CONTEXT_ENV: ${{ inputs.CONTEXT_ENV }}
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        run: |
+          pip install jira
+          python -m helpers.jira_ticket_validation

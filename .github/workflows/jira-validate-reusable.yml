@@ -1,0 +1,77 @@
+name: Jira validation reusable workflow
+
+on:
+  workflow_call:
+    inputs:
+      CONTEXT_ENV:
+        description: Prod env
+        required: true
+        type: string
+    secrets:
+      JIRA_BASE_URL:
+        required: true
+      JIRA_USER_EMAIL:
+        required: true
+      JIRA_API_TOKEN:
+        required: true
+
+jobs:
+ validate-ticket:
+    name: Validate Jira ticket
+    if: ${{ github.event.pull_request.merged }}
+    runs-on: ubuntu-latest
+    outputs:
+      current_branch: ${{ steps.branch-names.outputs.current_branch }}
+      issue_id: ${{ steps.set-run-artefacts.outputs.issue_id }}
+      is_revert: ${{ steps.set-run-artefacts.outputs.is_revert }}
+      run_url: ${{ steps.set-run-url.outputs.url }}
+      issue_url: ${{ steps.validate-ticket.outputs.issue_url }}
+      issue_summary: ${{ steps.validate-ticket.outputs.issue_summary }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+      - name: Get branch names
+        id: branch-names
+        uses: tj-actions/branch-names@v5.2
+      - name: Set run artefacts
+        id: set-run-artefacts
+        env:
+          BRANCH: ${{ steps.branch-names.outputs.current_branch }}
+        run: |
+          python -m helpers.set_run_artefacts
+      - name: Get run url
+        id: set-run-url
+        run: |
+          url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "::set-output name=url::$url"
+      - name: Set last commit data
+        id: set-last-commit-date
+        run: |
+          last_commit_date=$(TZ=gmt git show -s --date=format-local:'%Y-%m-%d %H:%M' --format=%cd $(git rev-parse origin/${{ steps.branch-names.outputs.current_branch }}))
+          echo "::set-output name=last_commit_date::$last_commit_date"
+      - name: Validate ticket
+        id: validate-ticket
+        env:
+          ISSUE_KEY: ${{ steps.set-run-artefacts.outputs.issue_id }}
+          LAST_COMMIT_DATE: ${{ steps.set-last-commit-date.outputs.last_commit_date }}
+          CONTEXT_ENV: ${{ inputs.CONTEXT_ENV }}
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        run: |
+          pip install jira
+          python -m helpers.jira_ticket_validation
+      - name: Transition to Merged
+        env:
+          ISSUE_KEY: ${{ steps.set-run-artefacts.outputs.issue_id }}
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          COMMENT: Ticket merged with master via ${{ steps.set-run-url.outputs.url }}
+          STATUS: Merged
+        run: |
+          python -m helpers.jira_ticket_transition
