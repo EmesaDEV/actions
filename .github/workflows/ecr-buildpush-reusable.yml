@@ -1,0 +1,44 @@
+name: ECR build and push reusable workflow
+
+on:
+  workflow_call:
+    inputs:
+      AWS_ACCOUNT_ID:
+        description: AWS account ID where ECR exists
+        required: true
+        type: string
+      TAGS:
+        description: docker image tags
+        required: true
+        type: string
+    secrets:
+      AWS_ACCESS_KEY:
+        required: true
+      AWS_ACCESS_SECRET:
+        required: true
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-skip-session-tagging: true
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET }}
+          role-to-assume: "arn:aws:iam::${{ inputs.AWS_ACCOUNT_ID }}:role/Emesa-GitHub"
+          aws-region: eu-central-1
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          registries: "${{ inputs.AWS_ACCOUNT_ID }}"
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          push: true
+          tags: ${{ inputs.TAGS }}

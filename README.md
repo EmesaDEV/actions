@@ -50,3 +50,27 @@ Required inputs and secrets:
 ```
 Example usage:
 https://github.com/EmesaDEV/dwh-lambda/tree/master/.github/workflows
+
+## [Build Push ECR](https://github.com/EmesaDEV/actions/blob/master/.github/workflows/ecr-buildpush-reusable.yml) 
+## [Build Push ECR Self-hosted](https://github.com/EmesaDEV/actions/blob/master/.github/workflows/ecr-buildpush-selfhosted-reusable.yml) 
+It is used to build and push images to AWS ECR
+
+Required inputs and secrets:
+```
+    inputs:
+      AWS_ACCOUNT_ID:
+        description: AWS account ID where ECR exists
+        required: true
+        type: string
+      TAGS:
+        description: docker image tags
+        required: true
+        type: string
+    secrets:
+      AWS_ACCESS_KEY:
+        required: true
+      AWS_ACCESS_SECRET:
+        required: true
+```
+Example usage:
+https://github.com/EmesaDEV/github-hosted-runner/blob/master/.github/workflows/image_build.yml
