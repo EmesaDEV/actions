@@ -74,3 +74,58 @@ Required inputs and secrets:
 ```
 Example usage:
 https://github.com/EmesaDEV/github-hosted-runner/blob/master/.github/workflows/image_build.yml
+
+## [Terraform Plan](https://github.com/EmesaDEV/actions/blob/master/.github/workflows/terraform-plan-reusable.yml) 
+## [Terraform Apply](https://github.com/EmesaDEV/actions/blob/master/.github/workflows/terraform-apply-reusable.yml) 
+It is used to plan and apply terraform 
+
+Required inputs and secrets:
+```
+    inputs:
+      project_key:
+        description: 'The key of the project used in github oidc AWS role'
+        required: true
+        type: string
+      environment:
+        description: 'The terraform environment'
+        required: true
+        type: string
+      AWS_REGION:
+        description: 'AWS region'
+        required: true
+        type: string
+    secrets:
+      AWS_ACCOUNT_NUMBER:
+        required: true
+```
+Example usage:
+https://github.com/EmesaDEV/data-infra/blob/master/.github/workflows/terraform-deploy-dev.yml
+
+## [Manual Approval](https://github.com/EmesaDEV/actions/blob/master/.github/workflows/manual-approval-reusable.yml)
+It is used to get a manual approval between jobs
+
+Required inputs and secrets:
+```
+    inputs:
+      environment:
+        description: 'The terraform environment'
+        required: true
+        type: string
+      approvers:
+        description: 'Approvers (team or github handles)'
+        required: false
+        type: string
+        default: cell-devops
+      minimum-approvals:
+        description: 'Minimum number of approvals to pass'
+        required: false
+        type: number
+        default: 1
+      timeout-minutes:
+        description: 'Number of minutes to wait for approvals'
+        required: false
+        type: number
+        default: 15
+```
+Example usage:
+https://github.com/EmesaDEV/data-infra/blob/master/.github/workflows/terraform-deploy-dev.yml
