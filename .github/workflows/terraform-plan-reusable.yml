@@ -18,6 +18,8 @@ on:
     secrets:
       AWS_ACCOUNT_NUMBER:
         required: true
+      GIT_CLONE_TOKEN:
+        required: true
 
 permissions:
   id-token: write
@@ -37,6 +39,9 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_NUMBER }}:role/github-actions-${{ inputs.project_key }}-${{ inputs.environment }}
           role-session-name: ${{ inputs.project_key }}-${{ inputs.environment }}
           aws-region: ${{ inputs.AWS_REGION }}
+      - name: Configure ability to fetch terraform modules from private repos
+        run: |
+          git config --global url."https://foo:${{ secrets.GIT_CLONE_TOKEN }}@github.com".insteadOf "ssh://git@github.com"
       - name: "terraform-init::${{ inputs.environment }}"
         id: init
         run: |
