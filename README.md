@@ -97,6 +97,8 @@ Required inputs and secrets:
     secrets:
       AWS_ACCOUNT_NUMBER:
         required: true
+      GIT_CLONE_TOKEN:
+        required: true  
 ```
 Example usage:
 https://github.com/EmesaDEV/data-infra/blob/master/.github/workflows/terraform-deploy-dev.yml
