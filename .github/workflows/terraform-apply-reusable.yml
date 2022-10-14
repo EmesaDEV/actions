@@ -1,0 +1,48 @@
+name: Terraform apply reusable workflow
+
+on:
+  workflow_call:
+    inputs:
+      project_key:
+        description: 'The key of the project used in github oidc AWS role'
+        required: true
+        type: string
+      environment:
+        description: 'The terraform environment'
+        required: true
+        type: string
+      AWS_REGION:
+        description: 'AWS region'
+        required: true
+        type: string
+    secrets:
+      AWS_ACCOUNT_NUMBER:
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+  packages: read
+
+jobs:
+  terraform-apply:
+    environment: ${{ inputs.environment }}
+    runs-on: self-hosted
+    concurrency: ci-${{ github.ref }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_NUMBER }}:role/github-actions-${{ inputs.project_key }}-${{ inputs.environment }}
+          role-session-name: ${{ inputs.project_key }}-${{ inputs.environment }}
+          aws-region: ${{ inputs.AWS_REGION }}
+      - name: "terraform-init::${{ inputs.environment }}"
+        id: init
+        run: |
+          terraform init  -upgrade -backend-config=backend-configs/${{ inputs.environment }}-backend.tfvars && ./resources/tf_ws_select.sh ${{ inputs.environment }}
+          terraform validate
+      - name: "terraform-apply::${{ inputs.environment }}"
+        id: apply
+        run: |
+          terraform apply -auto-approve -var-file=${{ inputs.environment }}.tfvars

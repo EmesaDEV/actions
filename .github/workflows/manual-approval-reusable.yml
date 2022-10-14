@@ -1,0 +1,47 @@
+name: Manual approval reusable workflow
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'The terraform environment'
+        required: true
+        type: string
+      approvers:
+        description: 'Approvers (team or github handles)'
+        required: false
+        type: string
+        default: cell-devops
+      minimum-approvals:
+        description: 'Minimum number of approvals to pass'
+        required: false
+        type: number
+        default: 1
+      timeout-minutes:
+        description: 'Number of minutes to wait for approvals'
+        required: false
+        type: number
+        default: 15
+
+    secrets:
+      GIT_CLONE_TOKEN:
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+  packages: read
+
+jobs:
+  manual-approval:
+    environment: ${{ inputs.environment }}
+    runs-on: self-hosted
+    concurrency: ci-${{ github.ref }}
+    steps:
+      - uses: trstringer/manual-approval@v1
+        timeout-minutes: ${{ inputs.timeout-minutes }}
+        with:
+          secret: ${{ secrets.GIT_CLONE_TOKEN }}
+          approvers: ${{ inputs.approvers }}
+          minimum-approvals: ${{ inputs.minimum-approvals }}
+          issue-title: "Deploying ${{ github.ref_name }} to ${{ inputs.environment }}"
