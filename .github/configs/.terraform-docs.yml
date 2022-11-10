@@ -1,0 +1,15 @@
+version: "0.16.0"
+formatter: markdown table
+header-from: "main.tf"
+settings:
+  anchor: true
+  color: true
+  default: true
+  description: false
+  escape: true
+  html: true
+  indent: 2
+  required: true
+  sensitive: true
+  type: true
+  hide-empty: true
