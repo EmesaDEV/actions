@@ -1,0 +1,55 @@
+name: Generate terraform docs
+
+on:
+  workflow_call:
+    inputs:
+      recursive:
+        description: 'If true it will update submodules recursively'
+        required: false
+        type: boolean
+        default: false
+      recursive-path:
+        description: 'Submodules path to recursively update'
+        required: false
+        type: string
+        default: modules
+      working-dir:
+        description: 'Comma separated list of directories to generate docs for'
+        required: false
+        type: string
+        default: .
+      config_location:
+        description: 'Linux style relative location, e.g. ..'
+        required: false
+        type: string
+        default: .
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  docs:
+    runs-on: self-hosted
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: ${{ github.event.pull_request.head.ref }}
+    - name: Checkout reusable workflow repo
+      uses: actions/checkout@v3
+      with:
+        ref: master
+        repository: EmesaDEV/actions
+        path: actions
+    - name: Generate terraform docs
+      uses: terraform-docs/gh-actions@v1.0.0
+      with:
+        args: "-c ${{ inputs.config_location }}/actions/.github/configs/.terraform-docs.yml"
+        output-file: README.md
+        output-method: inject
+        git-push: true
+        recursive: ${{ inputs.recursive }}
+        recursive-path: ${{ inputs.recursive-path }}
+        working-dir: ${{ inputs.working-dir }}
+
+
