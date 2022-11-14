@@ -35,5 +35,5 @@ jobs:
             echo "This is not a modules directory. Please use validation at the project level after initialization or choose a modules directory"
             exit 1
           else
-            for dir in $(ls -d */); do (cd "$dir" && pwd && terraform init -backend=false && terraform validate); done
+            for dir in ./*/; do (cd "$dir" && pwd && terraform init -backend=false && terraform validate); done
           fi

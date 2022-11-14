@@ -8,6 +8,11 @@ on:
         required: false
         type: boolean
         default: true
+      log_level:
+        description: 'Log level'
+        required: false
+        type: string
+        default: WARNING
 
 jobs:
   checkov-job:
@@ -18,7 +23,7 @@ jobs:
         uses: actions/checkout@v3
       - name: Run Checkov action
         id: checkov
-        uses: bridgecrewio/checkov-action@bb0220b84d1cf29490e505203566ed34451c816d
+        uses: bridgecrewio/checkov-action@v12.1857.0
         with:
           directory: .
           quiet: true # optional: display only failed checks
@@ -26,5 +31,5 @@ jobs:
           framework: terraform # optional: run only on a specific infrastructure {cloudformation,terraform,kubernetes,all}
           output_format: cli # optional: the output format, one of: cli, json, junitxml, github_failed_only
           download_external_modules: false # optional: download external terraform modules from public git repositories and terraform registry
-#          log_level: DEBUG # optional: set log level. Default WARNING
+          log_level: ${{ inputs.log_level }} # optional: set log level. Default WARNING
 #          check: CKV_AWS_1 # optional: run only a specific check_id. can be comma separated list
