@@ -18,11 +18,6 @@ on:
         required: false
         type: string
         default: .
-      config_location:
-        description: 'Linux style relative location, e.g. ..'
-        required: false
-        type: string
-        default: .
 
 permissions:
   id-token: write
@@ -38,13 +33,18 @@ jobs:
     - name: Checkout reusable workflow repo
       uses: actions/checkout@v3
       with:
-        ref: master
+        ref: ${{ github.event.pull_request.head.ref }}
         repository: EmesaDEV/actions
         path: actions
+    - name: GitIgnore terraform-docs config file
+      run: |
+        mkdir .terraform/
+        mv actions/.github/configs/.terraform-docs.yml ./.terraform/
+        rm -rf actions
     - name: Generate terraform docs
       uses: terraform-docs/gh-actions@v1.0.0
       with:
-        args: "-c ${{ inputs.config_location }}/actions/.github/configs/.terraform-docs.yml"
+        args: "-c .terraform/.terraform-docs.yml"
         output-file: README.md
         output-method: inject
         git-push: true
