@@ -15,10 +15,10 @@ jobs:
     name: checkov-action
     steps:
       - name: Checkout repo
-        uses: actions/checkout@master
+        uses: actions/checkout@v3
       - name: Run Checkov action
         id: checkov
-        uses: bridgecrewio/checkov-action@master
+        uses: bridgecrewio/checkov-action@bb0220b84d1cf29490e505203566ed34451c816d
         with:
           directory: .
           quiet: true # optional: display only failed checks

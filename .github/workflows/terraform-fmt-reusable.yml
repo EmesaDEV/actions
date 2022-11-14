@@ -14,7 +14,8 @@ on:
     secrets:
       POWERUSER_GITHUB_ACTIONS_TOKEN:
         required: true
-
+      GIT_CLONE_TOKEN:
+        required: true
 permissions:
   id-token: write
   contents: write

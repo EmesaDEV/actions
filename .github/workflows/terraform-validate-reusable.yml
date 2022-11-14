@@ -1,0 +1,39 @@
+name: Terraform validate
+
+on:
+  workflow_call:
+    inputs:
+      modules_subpath:
+        description: 'Module subpath. aws or helm for modules repository, usually "modules" for project repositories'
+        required: false
+        type: string
+        default: modules
+    secrets:
+      GIT_CLONE_TOKEN:
+        required: true
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  terraform-validate:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Configure ability to fetch terraform modules from private repos
+        run: |
+          git config --global url."https://foo:${{ secrets.GIT_CLONE_TOKEN }}@github.com".insteadOf "ssh://git@github.com"
+      - name: Terraform Validate modules
+        run: |
+          cd ${{ inputs.modules_subpath }}
+          if (ls *.tf) 
+          then
+            echo "This is not a modules directory. Please use validation at the project level after initialization or choose a modules directory"
+            exit 1
+          else
+            for dir in $(ls -d */); do (cd "$dir" && pwd && terraform init -backend=false && terraform validate); done
+          fi
