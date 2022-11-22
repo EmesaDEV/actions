@@ -3,6 +3,16 @@ name: Terraform plan reusable workflow
 on:
   workflow_call:
     inputs:
+      lock:
+        description: "Terraform lock. If false - don't hold a state lock during the operation"
+        required: false
+        type: boolean
+        default: true
+      concurrency_prefix:
+        description: "Concurrency prefix"
+        required: false
+        type: string
+        default: "ci"
       project_key:
         description: 'The key of the project used in github oidc AWS role'
         required: true
@@ -30,7 +40,7 @@ jobs:
   terraform-plan:
     environment: ${{ inputs.environment }}
     runs-on: self-hosted
-    concurrency: ci-${{ github.ref }}
+    concurrency: ${{ inputs.concurrency_prefix }}-${{ github.ref }}
     steps:
       - uses: actions/checkout@v3
       - name: Configure AWS credentials
@@ -50,4 +60,4 @@ jobs:
       - name: "terraform-plan::${{ inputs.environment }}"
         id: plan
         run: |
-          terraform plan -var-file=${{ inputs.environment }}.tfvars
+          terraform plan -lock=${{ inputs.lock }} -var-file=${{ inputs.environment }}.tfvars
