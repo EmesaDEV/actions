@@ -11,11 +11,6 @@ on:
         description: docker image tags
         required: true
         type: string
-      BUILD_FILE:
-        description: docker file to build
-        required: true
-        type: string
-        default: "Dockerfile"
     secrets:
       AWS_ACCESS_KEY:
         required: true
@@ -45,6 +40,5 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           context: .
-          file: "{context}/${{ inputs.BUILD_FILE }}"
           push: true
           tags: ${{ inputs.TAGS }}
