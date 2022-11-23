@@ -1,0 +1,58 @@
+name: ECR build and push reusable workflow using OIDC
+
+on:
+  workflow_call:
+    inputs:
+      AWS_REGION:
+        description: AWS account region
+        required: true
+        type: string
+      TAGS:
+        description: docker image tags
+        required: true
+        type: string
+      BUILD_FILE:
+        description: docker file to build
+        required: true
+        type: string
+        default: "Dockerfile"
+      project_key:
+        description: 'The key of the project used in github oidc AWS role'
+        required: true
+        type: string
+      environment:
+        description: 'The terraform environment'
+        required: true
+        type: string
+    secrets:
+      AWS_ACCOUNT_NUMBER:
+        required: true
+      GIT_CLONE_TOKEN:
+        required: true
+
+jobs:
+  build-push:
+    environment: ${{ inputs.environment }}
+    runs-on: self-hosted
+    concurrency: ${{ inputs.concurrency_prefix }}-${{ github.ref }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_NUMBER }}:role/github-actions-${{ inputs.project_key }}-${{ inputs.environment }}
+          role-session-name: ${{ inputs.project_key }}-${{ inputs.environment }}
+          aws-region: ${{ inputs.AWS_REGION }}
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          registries: "${{ secrets.AWS_ACCOUNT_NUMBER }}"
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: "{context}/${{ inputs.BUILD_FILE }}"
+          push: true
+          tags: ${{ inputs.TAGS }}
