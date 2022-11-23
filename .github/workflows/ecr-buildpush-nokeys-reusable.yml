@@ -32,7 +32,9 @@ on:
 
 jobs:
   build-push:
-    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    runs-on: self-hosted
+    concurrency: ${{ inputs.concurrency_prefix }}-${{ github.ref }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
