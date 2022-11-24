@@ -53,6 +53,6 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           context: .
-          file: "{context}/${{ inputs.BUILD_FILE }}"
+          file: "./${{ inputs.BUILD_FILE }}"
           push: true
           tags: ${{ inputs.TAGS }}
