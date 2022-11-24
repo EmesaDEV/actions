@@ -8,11 +8,11 @@ on:
         required: true
         type: string
       TAGS:
-        description: docker image tags
+        description: Docker image tags
         required: true
         type: string
       BUILD_FILE:
-        description: docker file to build
+        description: Docker file to build
         required: true
         type: string
         default: "Dockerfile"
