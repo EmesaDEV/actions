@@ -3,42 +3,67 @@ name: ECR build and push reusable workflow
 on:
   workflow_call:
     inputs:
-      AWS_ACCOUNT_ID:
-        description: AWS account ID where ECR exists
-        required: true
-        type: string
       TAGS:
         description: docker image tags
         required: true
         type: string
+      CONTEXT:
+        description: "Build's context is the set of files located in the specified PATH"
+        required: false
+        type: string
+        default: .
+      project_key:
+        description: 'The key of the project used in github oidc AWS role'
+        required: true
+        type: string
+      environment:
+        description: 'The terraform environment'
+        required: true
+        type: string
+      AWS_REGION:
+        description: 'AWS region'
+        required: true
+        type: string
     secrets:
-      AWS_ACCESS_KEY:
+      AWS_ACCOUNT_NUMBER:
         required: true
-      AWS_ACCESS_SECRET:
-        required: true
+
+permissions:
+  id-token: write
+  contents: read
+  packages: read
 
 jobs:
   build-push:
-    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    runs-on: self-hosted
+    concurrency: ${{ github.ref }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-      - name: Configure AWS Credentials
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          role-skip-session-tagging: true
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
-          aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET }}
-          role-to-assume: "arn:aws:iam::${{ inputs.AWS_ACCOUNT_ID }}:role/Emesa-GitHub"
-          aws-region: eu-central-1
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_NUMBER }}:role/github-actions-${{ inputs.project_key }}-${{ inputs.environment }}
+          role-session-name: ${{ inputs.project_key }}-${{ inputs.environment }}
+          aws-region: ${{ inputs.AWS_REGION }}
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
         with:
-          registries: "${{ inputs.AWS_ACCOUNT_ID }}"
+          registries: "${{ secrets.AWS_ACCOUNT_NUMBER }}"
+      - name: Set up Docker Context for Buildx
+        id: buildx-context
+        run: |
+              docker context create builders
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+            endpoint: builders
       - name: Build and push Docker image
         uses: docker/build-push-action@v3
         with:
-          context: .
+          context: ${{ inputs.CONTEXT }}
+          file: ${{ inputs.CONTEXT }}/Dockerfile
           push: true
-          tags: ${{ inputs.TAGS }}
+          tags: ${{ secrets.AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com/${{ inputs.TAGS }}
