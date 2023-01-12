@@ -24,9 +24,6 @@ on:
         description: 'AWS region'
         required: true
         type: string
-    secrets:
-      AWS_ACCOUNT_NUMBER:
-        required: true
 
 permissions:
   id-token: write
@@ -44,14 +41,14 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_NUMBER }}:role/github-actions-${{ inputs.project_key }}-${{ inputs.environment }}
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_NUMBER }}:role/github-actions-${{ inputs.project_key }}-${{ inputs.environment }}
           role-session-name: ${{ inputs.project_key }}-${{ inputs.environment }}
           aws-region: ${{ inputs.AWS_REGION }}
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
         with:
-          registries: "${{ secrets.AWS_ACCOUNT_NUMBER }}"
+          registries: "${{ vars.AWS_ACCOUNT_NUMBER }}"
       - name: Set up Docker Context for Buildx
         id: buildx-context
         run: |
@@ -66,4 +63,4 @@ jobs:
           context: ${{ inputs.CONTEXT }}
           file: ${{ inputs.CONTEXT }}/Dockerfile
           push: true
-          tags: ${{ secrets.AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com/${{ inputs.TAGS }}
+          tags: ${{ vars.AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com/${{ inputs.TAGS }}
