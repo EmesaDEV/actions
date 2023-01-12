@@ -11,6 +11,11 @@ on:
         description: 'Email of github poweruser'
         required: true
         type: string
+      continue_on_error:
+        description: 'If true - continue on error'
+        required: false
+        type: boolean
+        default: false
     secrets:
       POWERUSER_GITHUB_ACTIONS_TOKEN:
         required: true
@@ -23,6 +28,7 @@ permissions:
 jobs:
   terraform-fmt:
     runs-on: self-hosted
+    continue-on-error: ${{ inputs.continue_on_error }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
