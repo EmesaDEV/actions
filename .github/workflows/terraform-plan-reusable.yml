@@ -21,6 +21,11 @@ on:
         description: 'The terraform environment'
         required: true
         type: string
+      continue_on_error:
+        description: 'If true - continue on error'
+        required: false
+        type: boolean
+        default: false
       AWS_REGION:
         description: 'AWS region'
         required: true
@@ -38,6 +43,7 @@ permissions:
 
 jobs:
   terraform-plan:
+    continue-on-error: ${{ inputs.continue_on_error }}
     environment: ${{ inputs.environment }}
     runs-on: self-hosted
     concurrency: ${{ inputs.concurrency_prefix }}-${{ github.ref }}
