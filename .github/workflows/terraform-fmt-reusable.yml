@@ -47,6 +47,7 @@ jobs:
           git config --global user.name '${{ inputs.poweruser_name }}'.
           git config --global user.email '${{ inputs.poweruser_email }}'
           git add -- ./\*.tf
+          git add -- ./\*.tfvars
           if ! git diff-index --quiet --cached HEAD; then
             git commit -m "[AUTOMATED] Terraform fmt: format the codebase recursively"
           fi
