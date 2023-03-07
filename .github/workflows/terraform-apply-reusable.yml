@@ -4,24 +4,25 @@ on:
   workflow_call:
     inputs:
       project_key:
-        description: 'The key of the project used in github oidc AWS role'
+        description: The key of the project used in github oidc AWS role
         required: true
         type: string
       environment:
-        description: 'The terraform environment'
+        description: The terraform environment
         required: true
         type: string
       continue_on_error:
-        description: 'If true - continue on error'
+        description: If true - continue on error
         required: false
         type: boolean
         default: false
       AWS_REGION:
-        description: 'AWS region'
-        required: true
+        description: AWS region
+        required: false
         type: string
+        default: eu-central-1
     secrets:
-      GIT_CLONE_TOKEN:
+      GH_TOKEN:
         required: true
 
 permissions:
@@ -36,16 +37,19 @@ jobs:
     runs-on: self-hosted
     concurrency: ci-${{ github.ref }}
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+      - name: Configure ability to fetch terraform modules from private repos
+        run: |
+          git config --global url."https://foo:${{ secrets.GH_TOKEN }}@github.com".insteadOf "ssh://git@github.com"
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
           role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_NUMBER }}:role/github-actions-${{ inputs.project_key }}-${{ inputs.environment }}
           role-session-name: ${{ inputs.project_key }}-${{ inputs.environment }}
           aws-region: ${{ inputs.AWS_REGION }}
-      - name: Configure ability to fetch terraform modules from private repos
-        run: |
-          git config --global url."https://foo:${{ secrets.GIT_CLONE_TOKEN }}@github.com".insteadOf "ssh://git@github.com"
       - name: "terraform-init::${{ inputs.environment }}"
         id: init
         run: |

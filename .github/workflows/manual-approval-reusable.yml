@@ -22,9 +22,8 @@ on:
         required: false
         type: number
         default: 15
-
     secrets:
-      GIT_CLONE_TOKEN:
+      GH_TOKEN:
         required: true
 
 permissions:
@@ -41,7 +40,7 @@ jobs:
       - uses: trstringer/manual-approval@v1
         timeout-minutes: ${{ inputs.timeout-minutes }}
         with:
-          secret: ${{ secrets.GIT_CLONE_TOKEN }}
+          secret: ${{ secrets.GH_TOKEN }}
           approvers: ${{ inputs.approvers }}
           minimum-approvals: ${{ inputs.minimum-approvals }}
           issue-title: "Deploying ${{ github.ref_name }} to ${{ inputs.environment }}"

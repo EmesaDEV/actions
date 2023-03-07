@@ -3,21 +3,40 @@ name: Generate terraform docs
 on:
   workflow_call:
     inputs:
+      git_push_user_name:
+        description: Name to use for commit author
+        required: false
+        type: string
+        default: "github-actions[bot]"
+      git_push_user_email:
+        description: Email to use for commit author
+        required: false
+        type: string
+        default: "github-actions[bot]@users.noreply.github.com"
+      git_commit_message:
+        description: Commit message, optional
+        required: false
+        type: string
+        default: "[AUTOMATED] Update README"
       recursive:
-        description: 'If true it will update submodules recursively'
+        description: If true it will update submodules recursivel
         required: false
         type: boolean
         default: false
-      recursive-path:
-        description: 'Submodules path to recursively update'
+      recursive_path:
+        description: Submodules path to recursively update documentation
         required: false
         type: string
         default: modules
-      working-dir:
-        description: 'Comma separated list of directories to generate docs for'
+      working_dir:
+        description: Comma separated list of directories to generate docs for
         required: false
         type: string
         default: .
+    secrets:
+      GH_TOKEN:
+        description: PAT of system user (should be able to clone tf repos and pull/push to current repo)
+        required: true
 
 permissions:
   id-token: write
@@ -27,29 +46,32 @@ jobs:
   docs:
     runs-on: self-hosted
     steps:
-    - uses: actions/checkout@v3
-      with:
-        ref: ${{ github.event.pull_request.head.ref }}
-    - name: Checkout reusable workflow repo
-      uses: actions/checkout@v3
-      with:
-        ref: master
-        repository: EmesaDEV/actions
-        path: actions
-    - name: GitIgnore terraform-docs config file
-      run: |
-        mkdir .terraform/
-        mv actions/.github/configs/.terraform-docs.yml ./.terraform/
-        rm -rf actions
-    - name: Generate terraform docs
-      uses: terraform-docs/gh-actions@v1.0.0
-      with:
-        args: "-c .terraform/.terraform-docs.yml"
-        output-file: README.md
-        output-method: inject
-        git-push: true
-        recursive: ${{ inputs.recursive }}
-        recursive-path: ${{ inputs.recursive-path }}
-        working-dir: ${{ inputs.working-dir }}
-
-
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GH_TOKEN }}
+      - name: Checkout reusable workflow repo
+        uses: actions/checkout@v3
+        with:
+          ref: master
+          repository: EmesaDEV/actions
+          path: actions
+      - name: GitIgnore terraform-docs config file
+        run: |
+          mkdir .terraform/
+          mv actions/.github/configs/.terraform-docs.yml ./.terraform/
+          rm -rf actions
+      - name: Generate terraform docs
+        uses: terraform-docs/gh-actions@v1.0.0
+        with:
+          args: "-c .terraform/.terraform-docs.yml"
+          output-file: README.md
+          output-method: inject
+          git-commit-message: "${{ inputs.git_commit_message }}"
+          git-push: true
+          git-push-user-email: "${{ inputs.git_push_user_email }}"
+          git-push-user-name: "${{ inputs.git_push_user_name }}"
+          recursive: ${{ inputs.recursive }}
+          recursive-path: ${{ inputs.recursive_path }}
+          working-dir: ${{ inputs.working_dir }}

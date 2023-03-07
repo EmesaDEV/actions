@@ -3,23 +3,29 @@ name: Terraform fmt
 on:
   workflow_call:
     inputs:
-      poweruser_name:
-        description: 'Name of github poweruser'
-        required: true
+      git_push_user_name:
+        description: Name to use for commit author
+        required: false
         type: string
-      poweruser_email:
-        description: 'Email of github poweruser'
-        required: true
+        default: "github-actions[bot]"
+      git_push_user_email:
+        description: Email to use for commit author
+        required: false
         type: string
+        default: "github-actions[bot]@users.noreply.github.com"
+      git_commit_message:
+        description: Commit message
+        required: false
+        type: string
+        default: "[AUTOMATED] Format terraform codebase"
       continue_on_error:
-        description: 'If true - continue on error'
+        description: If true - continue on error'
         required: false
         type: boolean
         default: false
     secrets:
-      POWERUSER_GITHUB_ACTIONS_TOKEN:
-        required: true
-      GIT_CLONE_TOKEN:
+      GH_TOKEN:
+        description: PAT of system user (should be able to clone tf repos and pull/push to current repo)
         required: true
 permissions:
   id-token: write
@@ -34,9 +40,10 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ github.head_ref }}
+          token: ${{ secrets.GH_TOKEN }}
       - name: Configure ability to fetch terraform modules from private repos
         run: |
-          git config --global url."https://foo:${{ secrets.GIT_CLONE_TOKEN }}@github.com".insteadOf "ssh://git@github.com"
+          git config --global url."https://foo:${{ secrets.GH_TOKEN }}@github.com".insteadOf "ssh://git@github.com"
       - name: Terraform Format
         id: fmt
         run: terraform fmt -recursive
@@ -44,15 +51,15 @@ jobs:
       - name: Commit changes
         run: |
           sudo chown -R $USER:$USER .
-          git config --global user.name '${{ inputs.poweruser_name }}'.
-          git config --global user.email '${{ inputs.poweruser_email }}'
+          git config --global user.name '${{ inputs.git_push_user_name }}'
+          git config --global user.email '${{ inputs.git_push_user_email }}'
           git add -- ./\*.tf
           git add -- ./\*.tfvars
           if ! git diff-index --quiet --cached HEAD; then
-            git commit -m "[AUTOMATED] Terraform fmt: format the codebase recursively"
+            git commit -m "${{ inputs.git_commit_message }}"
           fi
       - name: Push changes for terraform fmt
         uses: ad-m/github-push-action@552c074ed701137ebd2bf098e70c394ca293e87f
         with:
-          github_token: ${{ secrets.POWERUSER_GITHUB_ACTIONS_TOKEN }}
+          github_token: ${{ secrets.GH_TOKEN }}
           branch: ${{ github.head_ref }}

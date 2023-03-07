@@ -21,9 +21,10 @@ on:
         required: true
         type: string
       AWS_REGION:
-        description: 'AWS region'
-        required: true
+        description: AWS region
+        required: false
         type: string
+        default: eu-central-1
 
 permissions:
   id-token: write

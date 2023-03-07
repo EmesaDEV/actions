@@ -4,17 +4,17 @@ on:
   workflow_call:
     inputs:
       modules_subpath:
-        description: 'Module subpath. aws or helm for modules repository, usually "modules" for project repositories'
+        description: Module subpath. "aws" or "helm" for EmesaDEV/tf-modules repository, usually "modules" for project repositories
         required: false
         type: string
         default: modules
       continue_on_error:
-        description: 'If true - continue on error'
+        description: If true - continue on error
         required: false
         type: boolean
         default: false
     secrets:
-      GIT_CLONE_TOKEN:
+      GH_TOKEN:
         required: true
 
 permissions:
@@ -30,9 +30,10 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ github.head_ref }}
+          token: ${{ secrets.GH_TOKEN }}
       - name: Configure ability to fetch terraform modules from private repos
         run: |
-          git config --global url."https://foo:${{ secrets.GIT_CLONE_TOKEN }}@github.com".insteadOf "ssh://git@github.com"
+          git config --global url."https://foo:${{ secrets.GH_TOKEN }}@github.com".insteadOf "ssh://git@github.com"
       - name: Terraform Validate modules
         run: |
           cd ${{ inputs.modules_subpath }}
