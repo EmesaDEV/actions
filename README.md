@@ -51,14 +51,25 @@ jobs:
       <parameter>: <value>  
 ```
 
-You can also pass data such as job information or passwords to a reusable workflow by using inputs and secret triggers. Inputs are used to pass non-sensitive information while secrets are used to pass along sensitive information such as passwords and credentials. You can learn more about that in [Github docs](https://docs.github.com/en/actions/using-workflows/reusing-workflows#using-inputs-and-secrets-in-a-reusable-workflow).
+You can also pass data such as job information or passwords to a reusable workflow by using inputs and secret triggers. Inputs are used to pass non-sensitive information while secrets are used to pass along sensitive information such as passwords and credentials. You can learn more about that in [GitHub docs](https://docs.github.com/en/actions/using-workflows/reusing-workflows#using-inputs-and-secrets-in-a-reusable-workflow).
 
 ### Some limitations with reusable workflows
 
 There are some limitations with reusable workflows.
 
 You can’t reference a reusable workflow that’s in a private repository. If you have a reusable workflow in a private repository, only other workflows in that private repository can use it.
-Reusable workflows can’t be stacked on top of one another. You can only have a reusable workflow call another reusable workflow, but you can’t have it reference more than one.
+
+You can connect a maximum of four levels of workflows - that is, the top-level caller workflow and up to three levels of reusable workflows. For example: caller-workflow.yml → called-workflow-1.yml → called-workflow-2.yml → called-workflow-3.yml. Loops in the workflow tree are not permitted. see more in [GitHub docs](https://docs.github.com/en/actions/using-workflows/reusing-workflows#nesting-reusable-workflows)
+
+From within a reusable workflow you can call another reusable workflow.
+
+You can call a maximum of 20 reusable workflows from a single workflow file. This limit includes any trees of nested reusable workflows that may be called starting from your top-level caller workflow file.
+
+For example, top-level-caller-workflow.yml → called-workflow-1.yml → called-workflow-2.yml counts as 2 reusable workflows.
+
+Any environment variables set in an env context defined at the workflow level in the caller workflow are not propagated to the called workflow. For more information, see [Variables](https://docs.github.com/en/actions/learn-github-actions/variables) and [Contexts](https://docs.github.com/en/actions/learn-github-actions/contexts#env-context).
+
+To reuse variables in multiple workflows, set them at the organization, repository, or environment levels and reference them using the vars context. For more information see [Variables](https://docs.github.com/en/actions/learn-github-actions/variables) and [Contexts](https://docs.github.com/en/actions/learn-github-actions/contexts#vars-context).
 
 ### Reusable workflows vs. composite actions
 
