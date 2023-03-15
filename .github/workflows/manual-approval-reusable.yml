@@ -23,7 +23,7 @@ on:
         type: number
         default: 15
     secrets:
-      GH_TOKEN:
+      PAT:
         required: true
 
 permissions:
@@ -40,7 +40,7 @@ jobs:
       - uses: trstringer/manual-approval@v1
         timeout-minutes: ${{ inputs.timeout-minutes }}
         with:
-          secret: ${{ secrets.GH_TOKEN }}
+          secret: ${{ secrets.PAT }}
           approvers: ${{ inputs.approvers }}
           minimum-approvals: ${{ inputs.minimum-approvals }}
           issue-title: "Deploying ${{ github.ref_name }} to ${{ inputs.environment }}"
