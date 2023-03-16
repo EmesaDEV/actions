@@ -4,11 +4,11 @@ on:
   workflow_call:
     inputs:
       environment:
-        description: 'The terraform environment'
+        description: The terraform environment
         required: true
         type: string
       approvers:
-        description: 'Approvers (team or github handles)'
+        description: Approvers (comma-separated team or github handles)
         required: false
         type: string
         default: cell-devops
@@ -18,7 +18,7 @@ on:
         type: number
         default: 1
       timeout-minutes:
-        description: 'Number of minutes to wait for approvals'
+        description: Number of minutes to wait for approvals
         required: false
         type: number
         default: 15

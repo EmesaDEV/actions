@@ -1,0 +1,48 @@
+name: "Terraform deploy with approval"
+
+on:
+  workflow_call:
+    inputs:
+      project-key:
+        description: The key of the project used in github oidc AWS role
+        required: true
+        type: string
+      approvers: 
+        description: Approvers (comma-separated team or github handles)
+        required: false
+        type: string
+        default: cell-devops
+    secrets:
+      PAT:
+        required: true
+      AWS_ACCOUNT_NUMBER:
+        required: true
+        
+jobs:
+  terraform-plan:
+    uses: ./terraform-plan-reusable.yml
+    with:
+      project-key: ${{ inputs.project-key }}
+      environment: ${{ inputs.environment }}
+    secrets:
+      AWS_ACCOUNT_NUMBER: ${{ secrets.AWS_ACCOUNT_NUMBER }}
+      PAT: ${{ secrets.PAT }}
+  manual-approval:
+    needs: 
+      - terraform-plan
+    uses: ./manual-approval-reusable.yml
+    with:
+      environment: ${{ inputs.environment }}
+      approvers: ${{ inputs.approvers }}
+    secrets:
+      PAT: ${{ secrets.PAT }}
+  terraform-apply:
+    needs: 
+      - manual-approval
+    uses: ./terraform-apply-reusable.yml
+    with:
+      project-key: ${{ inputs.project-key }}
+      environment:  ${{ inputs.environment }}
+    secrets:
+      AWS_ACCOUNT_NUMBER: ${{ secrets.AWS_ACCOUNT_NUMBER }}
+      PAT: ${{ secrets.PAT }}
