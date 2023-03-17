@@ -3,13 +3,13 @@ name: Terraform static checks
 on:
   workflow_call:
     inputs:
-      soft_fail:
-        description: 'Do not return an error code if there are failed checks'
+      continue-on-error:
+        description: Do not return an error code if there are failed checks
         required: false
         type: boolean
         default: true
-      log_level:
-        description: 'Log level'
+      log-level:
+        description: Log level
         required: false
         type: string
         default: WARNING
@@ -19,7 +19,7 @@ jobs:
     runs-on: self-hosted
     name: checkov-action
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v3
       - name: Run Checkov action
         id: checkov
@@ -27,9 +27,9 @@ jobs:
         with:
           directory: .
           quiet: true # optional: display only failed checks
-          soft_fail: ${{ inputs.soft_fail }} # optional: do not return an error code if there are failed checks
+          soft_fail: ${{ inputs.continue-on-error }}
           framework: terraform # optional: run only on a specific infrastructure {cloudformation,terraform,kubernetes,all}
           output_format: cli # optional: the output format, one of: cli, json, junitxml, github_failed_only
           download_external_modules: false # optional: download external terraform modules from public git repositories and terraform registry
-          log_level: ${{ inputs.log_level }} # optional: set log level. Default WARNING
+          log_level: ${{ inputs.log-level }}
 #          check: CKV_AWS_1 # optional: run only a specific check_id. can be comma separated list
