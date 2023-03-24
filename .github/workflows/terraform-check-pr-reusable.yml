@@ -1,0 +1,106 @@
+name: Check Pull Request
+
+on:
+  workflow_call:
+    inputs:
+      project-key:
+        description: 'The key of the project used in github oidc AWS role'
+        required: true
+        type: string
+      git-push-user-name:
+        description: Name to use for commit author
+        required: false
+        type: string
+        default: "github-actions[bot]"
+      git-push-user-email:
+        description: Email to use for commit author
+        required: false
+        type: string
+        default: "github-actions[bot]@users.noreply.github.com"
+    secrets:
+      PAT:
+        description: PAT of system user (should be able to clone tf repos and pull/push to current repo)
+        required: true
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  terraform-fmt:
+    uses: ./terraform-fmt-reusable.yml
+    with:
+      git-push-user-name: ${{ inputs.git-push-user-email }}
+      git-push-user-email: ${{ inputs.git-push-user-email }}
+    secrets:
+      PAT: ${{ secrets.PAT }}
+
+  docs:
+    uses: ./terraform-documentation-reusable.yml
+    # don't start before fmt as the PR may be updated (fmt takes less time to complete) 
+    needs:
+      - terraform-fmt
+    with:
+      git-push-user-name: ${{ inputs.git-push-user-email }}
+      git-push-user-email: ${{ inputs.git-push-user-email }}
+    secrets:
+      PAT: ${{ secrets.PAT }}
+
+  checkov:
+    uses: ./terraform-checkov-reusable.yml
+    # don't start before fmt/docs as the PR may be updated
+    needs:
+      - terraform-fmt
+      - docs
+  
+  detect-envs:
+    runs-on: self-hosted
+    # don't start before fmt/docs as the PR may be updated
+    needs:
+      - terraform-fmt
+      - docs 
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3    
+      - name: Get environments
+        id: get-environments
+        run: |
+          #!/bin/bash
+
+          # find all .tfvars files but not .auto.tfvars files in the current directory
+          files=$(find . -maxdepth 1 -type f -name "*.tfvars" ! -name "*.auto.tfvars")
+
+          # create a JSON list of the file names without ./ and .tfvars
+          json="["
+          while IFS= read -r file; do
+            file=$(basename "$file") # remove ./ prefix
+            file="${file%.tfvars}" # remove .tfvars suffix
+            json="$json\"$file\", "
+          done <<< "$files"
+          # remove the trailing comma and add the closing bracket
+          json="${json%, *}]" 
+
+          # echo the JSON list to $GITHUB_OUTPUT
+          echo "environments=$json" >> $GITHUB_OUTPUT
+    outputs:
+      environments: ${{ steps.get-environments.outputs.environments }}
+
+  terraform-plan:
+    strategy:
+      matrix:
+        environment: ${{ fromJSON( needs.detect-envs.outputs.environments )}}
+    uses: ./terraform-plan-reusable.yml
+    # don't start before fmt/docs as the PR may be updated
+    needs:
+      - terraform-fmt
+      - docs
+      - detect-envs
+    with:
+      lock: false
+      environment: ${{ matrix.environment }}
+      concurrency-prefix: ${{ matrix.environment }}-${{ github.run_id }}-${{ github.run_attempt }}
+      continue-on-error: true
+      project-key: ${{ inputs.project-key }}
+    secrets:
+      AWS_ACCOUNT_NUMBER: ${{ secrets.AWS_ACCOUNT_NUMBER }}
+      PAT: ${{ secrets.PAT }}
