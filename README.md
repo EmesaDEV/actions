@@ -143,6 +143,8 @@ Required inputs and secrets:
 
 It is used to plan and apply terraform
 
+Note: For every environment you must create an environment variable called AWS_ACCOUNT_NUMBER" used to assume a proper role.
+
 Required inputs and secrets:
 
 ```yaml
@@ -155,14 +157,8 @@ Required inputs and secrets:
         description: 'The terraform environment'
         required: true
         type: string
-      AWS_REGION:
-        description: 'AWS region'
-        required: true
-        type: string
     secrets:
-      AWS_ACCOUNT_NUMBER:
-        required: true
-      GIT_CLONE_TOKEN:
+      PAT:
         required: true  
 ```
 
