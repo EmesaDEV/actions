@@ -3,6 +3,11 @@ name: Terraform static checks
 on:
   workflow_call:
     inputs:
+      runs-on:
+        description: The type of machine to run the job on. The machine can be either a GitHub-hosted runner, or a self-hosted runner.
+        required: false
+        type: string
+        default: self-hosted
       continue-on-error:
         description: Do not return an error code if there are failed checks
         required: false

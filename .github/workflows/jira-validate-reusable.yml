@@ -3,6 +3,11 @@ name: Jira validation reusable workflow
 on:
   workflow_call:
     inputs:
+      runs-on:
+        description: The type of machine to run the job on. The machine can be either a GitHub-hosted runner, or a self-hosted runner.
+        required: false
+        type: string
+        default: ubuntu-latest
       CONTEXT_ENV:
         description: Prod env
         required: true
@@ -19,7 +24,7 @@ jobs:
  validate-ticket:
     name: Validate Jira ticket
     if: ${{ github.event.pull_request.merged }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     outputs:
       current_branch: ${{ steps.branch-names.outputs.current_branch }}
       issue_id: ${{ steps.set-run-artefacts.outputs.issue_id }}
