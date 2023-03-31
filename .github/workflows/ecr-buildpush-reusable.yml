@@ -34,7 +34,7 @@ permissions:
 jobs:
   build-push:
     environment: ${{ inputs.environment }}
-    runs-on: self-hosted
+    runs-on: ${{ inputs.runs-on }}
     concurrency: ${{ github.ref }}
     steps:
       - name: Checkout repository

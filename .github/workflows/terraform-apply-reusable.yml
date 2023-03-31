@@ -34,7 +34,7 @@ jobs:
   terraform-apply:
     continue-on-error: ${{ inputs.continue-on-error }}
     environment: ${{ inputs.environment }}
-    runs-on: self-hosted
+    runs-on: ${{ inputs.runs-on }}
     concurrency: ci-${{ github.ref }}
     steps:
       - name: Configure workflow to fetch private repos

@@ -34,7 +34,7 @@ permissions:
 jobs:
   manual-approval:
     environment: ${{ inputs.environment }}
-    runs-on: self-hosted
+    runs-on: ${{ inputs.runs-on }}
     concurrency: ci-${{ github.ref }}
     steps:
       - uses: trstringer/manual-approval@v1
