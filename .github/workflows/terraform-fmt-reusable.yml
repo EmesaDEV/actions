@@ -3,6 +3,11 @@ name: Terraform fmt
 on:
   workflow_call:
     inputs:
+      runs-on:
+        description: The type of machine to run the job on. The machine can be either a GitHub-hosted runner, or a self-hosted runner.
+        required: false
+        type: string
+        default: self-hosted
       git-push-user-name:
         description: Name to use for commit author
         required: false
@@ -33,7 +38,7 @@ permissions:
 
 jobs:
   terraform-fmt:
-    runs-on: self-hosted
+    runs-on: ${{ inputs.runs-on }}
     continue-on-error: ${{ inputs.continue-on-error }}
     steps:
       - name: Configure workflow to fetch private repos

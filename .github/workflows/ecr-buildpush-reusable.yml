@@ -3,6 +3,11 @@ name: ECR build and push reusable workflow
 on:
   workflow_call:
     inputs:
+      runs-on:
+        description: The type of machine to run the job on. The machine can be either a GitHub-hosted runner, or a self-hosted runner.
+        required: false
+        type: string
+        default: ubuntu-latest
       TAGS:
         description: docker image tags
         required: true
@@ -34,7 +39,7 @@ permissions:
 jobs:
   build-push:
     environment: ${{ inputs.environment }}
-    runs-on: self-hosted
+    runs-on: ${{ inputs.runs-on }}
     concurrency: ${{ github.ref }}
     steps:
       - name: Checkout repository
@@ -42,14 +47,14 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_NUMBER }}:role/github-actions-${{ inputs.project-key }}-${{ inputs.environment }}
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/github-actions-${{ inputs.project-key }}-${{ inputs.environment }}
           role-session-name: ${{ inputs.project-key }}-${{ inputs.environment }}
           aws-region: ${{ inputs.AWS_REGION }}
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
         with:
-          registries: "${{ vars.AWS_ACCOUNT_NUMBER }}"
+          registries: "${{ vars.AWS_ACCOUNT_ID }}"
       - name: Set up Docker Context for Buildx
         id: buildx-context
         run: |
@@ -64,4 +69,4 @@ jobs:
           context: ${{ inputs.CONTEXT }}
           file: ${{ inputs.CONTEXT }}/Dockerfile
           push: true
-          tags: ${{ vars.AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com/${{ inputs.TAGS }}
+          tags: ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com/${{ inputs.TAGS }}

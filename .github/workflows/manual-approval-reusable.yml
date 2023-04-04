@@ -3,6 +3,11 @@ name: Manual approval reusable workflow
 on:
   workflow_call:
     inputs:
+      runs-on:
+        description: The type of machine to run the job on. The machine can be either a GitHub-hosted runner, or a self-hosted runner.
+        required: false
+        type: string
+        default: self-hosted
       environment:
         description: The terraform environment
         required: true
@@ -34,7 +39,7 @@ permissions:
 jobs:
   manual-approval:
     environment: ${{ inputs.environment }}
-    runs-on: self-hosted
+    runs-on: ${{ inputs.runs-on }}
     concurrency: ci-${{ github.ref }}
     steps:
       - uses: trstringer/manual-approval@v1

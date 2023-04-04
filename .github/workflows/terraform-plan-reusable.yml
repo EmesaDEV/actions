@@ -3,6 +3,11 @@ name: Terraform plan reusable workflow
 on:
   workflow_call:
     inputs:
+      runs-on:
+        description: The type of machine to run the job on. The machine can be either a GitHub-hosted runner, or a self-hosted runner.
+        required: false
+        type: string
+        default: self-hosted
       lock:
         description: "Terraform lock. If false - don't hold a state lock during the operation"
         required: false
@@ -44,7 +49,7 @@ jobs:
   terraform-plan:
     continue-on-error: ${{ inputs.continue-on-error }}
     environment: ${{ inputs.environment }}
-    runs-on: self-hosted
+    runs-on: ${{ inputs.runs-on }}
     concurrency: ${{ inputs.concurrency-prefix }}-${{ github.ref }}
     steps:
       - name: Configure workflow to fetch private repos
@@ -57,7 +62,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_NUMBER }}:role/github-actions-${{ inputs.project-key }}-${{ inputs.environment }}
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/github-actions-${{ inputs.project-key }}-${{ inputs.environment }}
           role-session-name: ${{ inputs.project-key }}-${{ inputs.environment }}
           aws-region: ${{ inputs.AWS_REGION }}
       - name: "terraform-init::${{ inputs.environment }}"

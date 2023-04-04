@@ -143,7 +143,7 @@ Required inputs and secrets:
 
 It is used to plan and apply terraform
 
-Note: For every environment you must create an environment variable called AWS_ACCOUNT_NUMBER" used to assume a proper role.
+Note: For every environment you must create an environment variable called "AWS_ACCOUNT_ID" used to assume a proper role.
 
 Required inputs and secrets:
 

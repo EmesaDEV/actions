@@ -3,6 +3,11 @@ name: Terraform validate
 on:
   workflow_call:
     inputs:
+      runs-on:
+        description: The type of machine to run the job on. The machine can be either a GitHub-hosted runner, or a self-hosted runner.
+        required: false
+        type: string
+        default: self-hosted
       modules-subpath:
         description: Module subpath. "aws" or "helm" for EmesaDEV/tf-modules repository, usually "modules" for project repositories
         required: false
@@ -23,7 +28,7 @@ permissions:
 
 jobs:
   terraform-validate:
-    runs-on: self-hosted
+    runs-on: ${{ inputs.runs-on }}
     continue-on-error: ${{ inputs.continue-on-error }}
     steps:
       - name: Configure workflow to fetch private repos
