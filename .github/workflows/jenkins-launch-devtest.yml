@@ -1,0 +1,53 @@
+name: Launch on-prem environment
+
+on:
+  workflow_call:
+    inputs:
+      hostname-prefix:
+        description: 'The hostname prefix of the new environment'
+        required: true
+        type: string
+      container-type:
+        description: 'The type of the new environment'
+        required: true
+        type: string
+      project:
+        description: 'The project of the new environment'
+        required: true
+        type: string
+      branch:
+        description: 'The branch of the application to checkout'
+        required: false
+        type: string
+        default: master
+      job-timeout:
+        description: 'Jenkins job timeout period. Default 600 seconds'
+        required: false
+        type: number
+        default: 600
+      jenkins-url:
+        description: 'The URL for Jenkins'
+        required: true
+        type: string
+      
+
+jobs:
+  launch-onprem-env:
+    runs-on: self-hosted
+    steps:
+      - name: Invoke Jenkins
+        uses: toptal/jenkins-job-trigger-action@048a4d3
+        with:
+          jenkins_url: ${{ inputs.jenkins-url }}
+          jenkins_user: ${{ secrets.JENKINS_USER }}
+          jenkins_token: ${{ secrets.JENKINS_TOKEN }}
+          job_name: lxd-hammer-launch
+          job_params: |
+            {
+              hostname_prefix: ${{ inputs.hostname-prefix }},
+              container_type: ${{ inputs.container-type }},
+              project: ${{ inputs.project }},
+              branch: ${{ inputs.branch }}
+            }
+          job_timeout: ${{ inputs.job-timeout }}
+          async: false
