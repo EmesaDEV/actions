@@ -29,6 +29,11 @@ on:
         description: 'The URL for Jenkins'
         required: true
         type: string
+    secrets:
+      JENKINS_USER:
+        required: true
+      JENKINS_TOKEN:
+        required: true
       
 
 jobs:
