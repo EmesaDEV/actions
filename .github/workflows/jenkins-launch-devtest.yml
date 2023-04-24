@@ -41,7 +41,7 @@ jobs:
     runs-on: self-hosted
     steps:
       - name: Invoke Jenkins
-        uses: toptal/jenkins-job-trigger-action@048a4d3
+        uses: toptal/jenkins-job-trigger-action@048a4d3eb735843c22608f4f0e58bf05830233f6
         with:
           jenkins_url: ${{ inputs.jenkins-url }}
           jenkins_user: ${{ secrets.JENKINS_USER }}
