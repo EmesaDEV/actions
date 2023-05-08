@@ -1,4 +1,4 @@
-name: Terraform plan reusable workflow
+name: Terraform detect drift reusable workflow
 
 on:
   workflow_call:
@@ -24,7 +24,7 @@ on:
         type: string
         default: "ci"
       project-key:
-        description: 'The key of the project used in github oidc AWS role'
+        description: "The key of the project used in github oidc AWS role"
         required: true
         type: string
       environment:
@@ -32,7 +32,7 @@ on:
         required: true
         type: string
       continue-on-error:
-        description: 'If true - continue on error'
+        description: "If true - continue on error"
         required: false
         type: boolean
         default: false
@@ -40,7 +40,15 @@ on:
         description: Will also error if there is a diff between code and infrastructure
         required: false
         type: boolean
-        default: false
+        default: true
+      slack-channel-drift:
+        description: Slack channel to notify about tf plan drift, comma-separate list of channel names or ids
+        required: true
+        type: string
+      slack-channel-error:
+        description: Slack channel to notify about tf plan error, comma-separate list of channel names or ids
+        required: true
+        type: string
       AWS_REGION:
         description: AWS region
         required: false
@@ -48,6 +56,8 @@ on:
         default: eu-central-1
     secrets:
       PAT:
+        required: true
+      SLACK_BOT_TOKEN:
         required: true
     outputs:
       status:
@@ -81,11 +91,13 @@ jobs:
           role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/github-actions-${{ inputs.project-key }}-${{ inputs.environment }}
           role-session-name: ${{ inputs.project-key }}-${{ inputs.environment }}
           aws-region: ${{ inputs.AWS_REGION }}
+        # continue-on-error: true
       - name: "terraform-init::${{ inputs.environment }}"
         id: init
         run: |
           terraform init  -upgrade -backend-config=backend-configs/${{ inputs.environment }}-backend.tfvars && ./resources/tf_ws_select.sh ${{ inputs.environment }}
           terraform validate
+        # continue-on-error: true
       - name: "terraform-plan::${{ inputs.environment }}"
         id: plan
         run: |
@@ -109,3 +121,89 @@ jobs:
               fi
               ;;
           esac
+
+  # Make sure to add "github actions" app to the channel
+
+  slack-notify-plan-drift:
+    runs-on: ${{ inputs.runs-on }}
+    if: ${{ always() && needs.terraform-plan.outputs.status == 'diff' }}
+    needs:
+      - terraform-plan
+    steps:
+      - name: Post to a Slack channel
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          channel-id: ${{ inputs.slack-channel-drift }}
+          payload: |
+            {
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    {
+                      "title": "Terraform plan for \"${{ inputs.environment }}\" in \"${{ inputs.project-key }}\"",
+                      "short": false,
+                      "value": "Has detected infrastructure drift."
+                    }
+                  ]
+                }
+              ]
+            }    
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+  slack-notify-plan-error:
+    runs-on: ${{ inputs.runs-on }}
+    if: ${{ always() && needs.terraform-plan.outputs.status == 'error' }}
+    needs:
+      - terraform-plan
+    steps:
+      - name: Post to a Slack channel
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          channel-id: ${{ inputs.slack-channel-drift }}
+          payload: |
+            {
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    {
+                      "title": "Terraform plan for \"${{ inputs.environment }}\" in \"${{ inputs.project-key }}\"",
+                      "short": false,
+                      "value": "Has detected errors."
+                    }
+                  ]
+                }
+              ]
+            }    
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+  slack-notify-error:
+    runs-on: ${{ inputs.runs-on }}
+    if: ${{ always() && needs.terraform-plan.outputs.status == '' }}
+    needs:
+      - terraform-plan
+    steps:
+      - name: Post to a Slack channel
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          channel-id: ${{ inputs.slack-channel-drift }}
+          payload: |
+            {
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    {
+                      "title": "Terraform plan for \"${{ inputs.environment }}\" in \"${{ inputs.project-key }}\"",
+                      "short": false,
+                      "value": "Could not run because of errors."
+                    }
+                  ]
+                }
+              ]
+            }    
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
