@@ -122,7 +122,14 @@ jobs:
               ;;
           esac
 
-  # Make sure to add "github actions" app to the channel
+  # IMPORTANT: Make sure to add "github actions" app to the channel
+
+  # NOTE: There is a problem with getting the exact step url.
+  # There is a workaraund which kind of works...
+  # https://github.com/orgs/community/discussions/8945 but the problem is that when multiple jobs are triggered with the same name (our case with multiple envs),
+  # we need to add additional filtering based on the final job name eg `terraform-plan (test) / terraform-plan` which can also be truncated in some cases.
+  # Normally, there shouldn't be errors. And failed job will be highlighted anyways.
+  # So we post a link to overview page. This is good enough and doesn't have unstable "black magic".
 
   slack-notify-plan-drift:
     runs-on: ${{ inputs.runs-on }}
@@ -143,7 +150,7 @@ jobs:
                     {
                       "title": "Terraform plan for \"${{ inputs.environment }}\" in \"${{ inputs.project-key }}\"",
                       "short": false,
-                      "value": "Has detected infrastructure drift."
+                      "value": "Has detected infrastructure drift. <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|See details.>"
                     }
                   ]
                 }
@@ -171,7 +178,7 @@ jobs:
                     {
                       "title": "Terraform plan for \"${{ inputs.environment }}\" in \"${{ inputs.project-key }}\"",
                       "short": false,
-                      "value": "Has detected errors."
+                      "value": "Has detected errors. <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|See details.>"
                     }
                   ]
                 }
@@ -199,7 +206,7 @@ jobs:
                     {
                       "title": "Terraform plan for \"${{ inputs.environment }}\" in \"${{ inputs.project-key }}\"",
                       "short": false,
-                      "value": "Could not run because of errors."
+                      "value": "Could not run because of errors. <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|See details.>"
                     }
                   ]
                 }
