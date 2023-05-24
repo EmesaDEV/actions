@@ -1,0 +1,284 @@
+name: Terraform detect drift full reusable workflow
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: The type of machine to run the job on. The machine can be either a GitHub-hosted runner, or a self-hosted runner.
+        required: false
+        type: string
+        default: self-hosted
+      git-ref:
+        description: Git ref to checkout
+        required: false
+        type: string
+        default: ${{ github.head_ref }}
+      project-key:
+        description: "The key of the project used in github oidc AWS role"
+        required: true
+        type: string
+      skip-test-envs:
+        description: Skip which names end with "test"
+        required: false
+        type: boolean
+        default: true
+      skip-dev-envs:
+        description: Skip which names end with "dev"
+        required: false
+        type: boolean
+        default: true
+      slack-channel:
+        description: Slack channel to notify about tf plan drift, comma-separate list of channel names or ids
+        required: true
+        type: string
+      AWS_REGION:
+        description: AWS region
+        required: false
+        type: string
+        default: eu-central-1
+    secrets:
+      PAT:
+        required: true
+      SLACK_BOT_TOKEN:
+        required: true
+
+jobs:
+
+  detect-envs:
+    runs-on: ${{ inputs.project-key }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.git-ref }}
+      - name: Get environments
+        id: get-environments
+        run: |
+          #!/bin/bash
+
+          # find all .tfvars files but not .auto.tfvars files in the current directory
+          files=$(find . -maxdepth 1 -type f -name "*.tfvars" ! -name "*.auto.tfvars")
+
+          # create a JSON list of the file names without ./ and .tfvars
+          json="["
+          while IFS= read -r file; do
+            file=$(basename "$file") # remove ./ prefix
+            file="${file%.tfvars}" # remove .tfvars suffix
+            if [ "${file: -4}" == "test" ] ; then
+              if [ '${{ inputs.skip-test-envs }}'' == 'true' ] ; then
+                continue # skip test envs
+              fi
+            fi
+            if [ "${file: -3}" == "dev" ] ; then
+              if [ '${{ inputs.skip-dev-envs }}'' == 'true' ] ; then
+                continue # skip dev envs
+              fi
+            fi
+            # everything else is either prod or envs with a special name
+            json="$json\"$file\", "
+          done <<< "$files"
+          # remove the trailing comma and add the closing bracket
+          json="${json%, *}]" 
+
+          # echo the JSON list to $GITHUB_OUTPUT
+          echo "environments=$json" >> $GITHUB_OUTPUT
+    outputs:
+      environments: ${{ steps.get-environments.outputs.environments }}
+
+  terraform-check-drift:
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: ${{ fromJSON( needs.detect-envs.outputs.environments )}}
+    uses: ./.github/workflows/terraform-plan-reusable.yml
+    needs:
+      - detect-envs
+    with:
+      runs-on: ${{ github.event.repository.name }}
+      git-ref: ${{ inputs.git-ref }}
+      lock: false
+      environment: ${{ matrix.environment }}
+      concurrency-prefix: ${{ matrix.environment }}-${{ github.run_id }}-${{ github.run_attempt }}
+      check-for-diff: true
+      continue-on-error: false
+      project-key: ${{ github.event.repository.name }}
+    secrets:
+      PAT: ${{ secrets.PAT }}
+  
+  notify:
+    if: ${{ failure() }}
+    runs-on: ${{ github.event.repository.name }}
+    needs:
+      - terraform-check-drift 
+    steps:
+      - name: Prepare slack contents
+        id: slack-payload
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.PAT }}
+          result-encoding: string
+          retries: 3
+          debug: true
+          script: |
+            const slackAttachments = [];
+
+            const jobsInfoRes = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId
+            });
+            const jobsInfo = jobsInfoRes.data;
+
+            for (const jobInfo of jobsInfo.jobs) { 
+              const failedStepsInfo = jobInfo.steps.filter(s => s.conclusion === "failure");
+              for (const failedStepInfo of failedStepsInfo) { 
+                console.log( jobInfo.name, failedStepInfo.name, failedStepInfo.conclusion );
+
+                /* 
+                  For a job name like "terraform-check-drift (dev) / terraform-plan", 
+                  we need to extract env name, the job name may be truncated, so we look into ".. (dev) .." part
+                */
+
+                const match = jobInfo.name.match(/\((.*?)\)/);
+                if (! match) {
+                  /*
+                    The error is not related to any particular environment,
+                    maybe related to checkout or env detection. Will report as an "unknown error"
+                  */
+
+                  slackAttachments.push({
+                    "color": "danger",
+                    "fields": [
+                      {
+                        "title": "There are some unknown errors.",
+                        "short": false,
+                        "value": "\"" + jobInfo.name + " " + failedStepInfo.name + "\"failed <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|See details.>"
+                      }
+                    ]
+                  });
+                  continue;
+                } 
+
+                const envName = match[1];
+                const jobLogs = await github.rest.actions.downloadJobLogsForWorkflowRun({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  job_id: jobInfo.id
+                });
+                // NOTE: ":0" is reponsible for a particular line in step log, ":0" will unfold log, but will point to its beginning, better 
+                const stepDetailsUrl = "${{ github.server_url }}/${{ github.repository }}/runs/" + jobInfo.id + "?#step:" + failedStepInfo.number + ":0"
+
+                /*
+                  Detect known errors, given that we know all step names in terraform-plan job
+                */
+
+                /* 
+                  Plan error or drift
+                */
+
+                if (failedStepInfo.name.includes("terraform-plan")) {
+                  // 1 is error, 2 is drift, 2 requires a special flag, if not enabled, we will detect error anyways
+                  const isError = jobLogs.data.includes("Error: Process completed with exit code 1.");
+                  const planLine = jobLogs.data.split('\n').filter(l => l.includes('Plan'))[0] || ""
+                  const match = planLine.match(/Plan: (.*)/);
+
+                  // There are some invisible symbols, so instead of regex, we split and remove all of them manually
+                  const planDetails = planLine.split("Plan:")[1].trim();
+                  const planOutcome = planDetails 
+                    ? "Plan is " + planDetails.replace('[0m ', '').replace('\u001b', '').trim()
+                    : "Plan preview is unavailable.";
+                  
+                  if (isError) {
+                    slackAttachments.push({
+                      "color": "danger",
+                      "fields": [
+                        {
+                          "title": "Plan detected some errors in " + envName ,
+                          "short": false,
+                          "value": planOutcome + " " + stepDetailsUrl + "|Details>"
+                        }
+                      ]
+                    });
+                  } else {
+                    slackAttachments.push({
+                      "color": "danger",
+                      "fields": [
+                        {
+                          "title": "Plan detected infrastructure drift in " + envName ,
+                          "short": false,
+                          "value": planOutcome + ". <" + stepDetailsUrl + "|Details>"
+                        }
+                      ]
+                    });
+                  }
+                  continue;
+                }
+
+                /*
+                  Could not init
+                */
+
+                if (failedStepInfo.name.includes("terraform-init")) {
+                  slackAttachments.push({
+                    "color": "danger",
+                    "fields": [
+                      {
+                        "title": "Terraform init failed in " + envName,
+                        "short": false,
+                        "value": "<" + stepDetailsUrl + "|Details>"
+                      }
+                    ]
+                  });
+                  continue;
+                }
+
+                /*
+                  Could not assume role or login
+                */
+
+                if (failedStepInfo.name === "Configure AWS credentials") {
+                  slackAttachments.push({
+                    "color": "danger",
+                    "fields": [
+                      {
+                        "title": "Could not configure credentials in " + envName,
+                        "short": false,
+                        "value": "<" + stepDetailsUrl + "|Details>"
+                      }
+                    ]
+                  });
+                  continue;
+                }
+
+                /*
+                  Finally, report is as a generic error
+                */
+
+                slackAttachments.push({
+                  "color": "danger",
+                  "fields": [
+                    {
+                      "title": "There are some unknown errors in " + envName,
+                      "short": false,
+                      "value": "<" + stepDetailsUrl + "|Details>"
+                    }
+                  ]
+                });
+                continue;
+              } 
+            }
+            slackAttachmentsJSON = JSON.stringify(slackAttachments, null, 2);
+            console.log(slackAttachmentsJSON);
+            core.setOutput("slack-attachments", slackAttachmentsJSON );
+            
+      - name: Post to a Slack channel
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          channel-id: ${{ inputs.slack-channel }}
+          payload: |
+            {
+              "text": "A problem with ${{ github.repository }} is detected.",
+              "attachments": ${{ steps.slack-payload.outputs.slack-attachments }}
+            }    
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}    
