@@ -62,15 +62,15 @@ jobs:
           # create a JSON list of the file names without ./ and .tfvars
           json="["
           while IFS= read -r file; do
-            file=$(basename "$file") # remove ./ prefix
+            file="$(basename "$file")" # remove ./ prefix
             file="${file%.tfvars}" # remove .tfvars suffix
             if [ "${file: -4}" == "test" ] ; then
-              if [ '${{ inputs.skip-test-envs }}'' == 'true' ] ; then
+              if [ '${{ inputs.skip-test-envs }}' == 'true' ] ; then
                 continue # skip test envs
               fi
             fi
             if [ "${file: -3}" == "dev" ] ; then
-              if [ '${{ inputs.skip-dev-envs }}'' == 'true' ] ; then
+              if [ '${{ inputs.skip-dev-envs }}' == 'true' ] ; then
                 continue # skip dev envs
               fi
             fi
