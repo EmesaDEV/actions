@@ -180,10 +180,9 @@ jobs:
                   // 1 is error, 2 is drift, 2 requires a special flag, if not enabled, we will detect error anyways
                   const isError = jobLogs.data.includes("Error: Process completed with exit code 1.");
                   const planLine = jobLogs.data.split('\n').filter(l => l.includes('Plan'))[0] || ""
-                  const match = planLine.match(/Plan: (.*)/);
 
                   // There are some invisible symbols, so instead of regex, we split and remove all of them manually
-                  const planDetails = planLine.split("Plan:")[1].trim();
+                  const planDetails = (planLine.split("Plan:")[1] || "").trim();
                   const planOutcome = planDetails 
                     ? "Plan is " + planDetails.replace('[0m ', '').replace('\u001b', '').trim()
                     : "Plan preview is unavailable.";
