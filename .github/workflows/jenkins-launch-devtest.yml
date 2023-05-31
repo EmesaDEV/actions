@@ -38,7 +38,7 @@ on:
 
 jobs:
   launch-onprem-env:
-    runs-on: [self-hosted, linux]
+    runs-on: [app-android-runner]
     steps:
       - name: Invoke Jenkins
         uses: toptal/jenkins-job-trigger-action@048a4d3eb735843c22608f4f0e58bf05830233f6
