@@ -8,6 +8,11 @@ on:
         required: false
         type: string
         default: self-hosted
+      git-ref:
+        description: Git ref to checkout
+        required: false
+        type: string
+        default: ${{ github.head_ref }}
       lock:
         description: "Terraform lock. If false - don't hold a state lock during the operation"
         required: false
@@ -31,6 +36,11 @@ on:
         required: false
         type: boolean
         default: false
+      check-for-diff:
+        description: Will also error if there is a diff between code and infrastructure
+        required: false
+        type: boolean
+        default: false
       AWS_REGION:
         description: AWS region
         required: false
@@ -39,6 +49,9 @@ on:
     secrets:
       PAT:
         required: true
+    outputs:
+      status:
+        value: ${{ jobs.terraform-plan.outputs.status }}
 
 permissions:
   id-token: write
@@ -51,6 +64,8 @@ jobs:
     environment: ${{ inputs.environment }}
     runs-on: ${{ inputs.runs-on }}
     concurrency: ${{ inputs.concurrency-prefix }}-${{ github.ref }}
+    outputs:
+      status: ${{ steps.plan.outputs.status }}
     steps:
       - name: Configure workflow to fetch private repos
         run: |
@@ -58,6 +73,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         with:
+          ref: ${{ inputs.git-ref }}
           token: ${{ secrets.PAT }}
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -73,4 +89,23 @@ jobs:
       - name: "terraform-plan::${{ inputs.environment }}"
         id: plan
         run: |
-          terraform plan -lock=${{ inputs.lock }} -var-file=${{ inputs.environment }}.tfvars
+          terraform plan -lock=${{ inputs.lock }} -var-file=${{ inputs.environment }}.tfvars -detailed-exitcode || error_code=$?
+          case $error_code in 
+            0)
+              echo "status=ok" >> $GITHUB_OUTPUT
+              exit 0
+              ;;
+            1)
+              echo "status=error" >> $GITHUB_OUTPUT
+              exit 1
+              ;;
+            2)
+              if ${{ inputs.check-for-diff }} ; then
+                echo "status=diff" >> $GITHUB_OUTPUT
+                exit 2
+              else
+                echo "status=ok" >> $GITHUB_OUTPUT
+                exit 0
+              fi
+              ;;
+          esac
