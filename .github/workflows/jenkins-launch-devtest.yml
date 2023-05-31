@@ -41,18 +41,18 @@ jobs:
     runs-on: [hammer-app-android]
     steps:
       - name: Invoke Jenkins
-        uses: toptal/jenkins-job-trigger-action@048a4d3eb735843c22608f4f0e58bf05830233f6
+        uses: jabbukka/jenkins-trigger@28c29b61f13bdc3d46b4a6dc9b2a8248ed3c6f0e
         with:
-          jenkins_url: ${{ inputs.jenkins-url }}
-          jenkins_user: ${{ secrets.JENKINS_USER }}
-          jenkins_token: ${{ secrets.JENKINS_TOKEN }}
+          url: ${{ inputs.jenkins-url }}
+          user_name: ${{ secrets.JENKINS_USER }}
+          api_token: ${{ secrets.JENKINS_TOKEN }}
           job_name: lxd-hammer-launch
-          job_params: |
+          parameter: |
             {
               hostname_prefix: ${{ inputs.hostname-prefix }},
               container_type: ${{ inputs.container-type }},
               project: ${{ inputs.project }},
               branch: ${{ inputs.branch }}
             }
-          job_timeout: ${{ inputs.job-timeout }}
-          async: false
+          timeout: ${{ inputs.job-timeout }}
+          wait: true
