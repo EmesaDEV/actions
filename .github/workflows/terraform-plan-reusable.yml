@@ -84,11 +84,13 @@ jobs:
       - name: "terraform-init::${{ inputs.environment }}"
         id: init
         run: |
+          export TF_LOG=DEBUG
           terraform init  -upgrade -backend-config=backend-configs/${{ inputs.environment }}-backend.tfvars && ./resources/tf_ws_select.sh ${{ inputs.environment }}
           terraform validate
       - name: "terraform-plan::${{ inputs.environment }}"
         id: plan
         run: |
+          export TF_LOG=DEBUG
           terraform plan -lock=${{ inputs.lock }} -var-file=${{ inputs.environment }}.tfvars -detailed-exitcode || error_code=$?
           case $error_code in 
             0)
