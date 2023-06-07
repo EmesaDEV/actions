@@ -53,7 +53,8 @@ jobs:
               "container_type": "${{ inputs.container-type }}",
               "project": "${{ inputs.project }}",
               "branch": "${{ inputs.branch }}",
-              "developer": "GithubActions"
+              "developer": "GithubActions",
+              "public_key": ""
             }
           timeout: ${{ inputs.job-timeout }}
           wait: true
