@@ -52,7 +52,8 @@ jobs:
               "hostname_prefix": "${{ inputs.hostname-prefix }}",
               "container_type": "${{ inputs.container-type }}",
               "project": "${{ inputs.project }}",
-              "branch": "${{ inputs.branch }}"
+              "branch": "${{ inputs.branch }}",
+              "developer": "jenkins"
             }
           timeout: ${{ inputs.job-timeout }}
           wait: true
