@@ -25,15 +25,6 @@ on:
         required: false
         type: number
         default: 600
-      # developer:
-      #   description: 'The name of the developer launching the environment'
-      #   required: false
-      #   type: string
-      #   default: github
-      # public-key:
-      #   description: 'The ssh public key the developer launching the environment'
-      #   required: true
-      #   type: string
       jenkins-url:
         description: 'The URL for Jenkins'
         required: true
@@ -61,9 +52,7 @@ jobs:
               "hostname_prefix": "${{ inputs.hostname-prefix }}",
               "container_type": "${{ inputs.container-type }}",
               "project": "${{ inputs.project }}",
-              "branch": "${{ inputs.branch }}",
-              "developer": "github",
-              "public_key": "nokey"
+              "branch": "${{ inputs.branch }}"
             }
           timeout: ${{ inputs.job-timeout }}
           wait: true
