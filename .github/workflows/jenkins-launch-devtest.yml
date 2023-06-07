@@ -43,16 +43,16 @@ jobs:
       - name: Invoke Jenkins
         uses: jabbukka/jenkins-trigger@28c29b61f13bdc3d46b4a6dc9b2a8248ed3c6f0e
         with:
-          url: "${{ inputs.jenkins-url }}"
+          url: ${{ inputs.jenkins-url }}
           user_name: ${{ secrets.JENKINS_USER }}
           api_token: ${{ secrets.JENKINS_TOKEN }}
           job_name: lxd-hammer-launch
           parameter: |
             {
-              hostname_prefix: ${{ inputs.hostname-prefix }},
-              container_type: ${{ inputs.container-type }},
-              project: ${{ inputs.project }},
-              branch: ${{ inputs.branch }}
+              "hostname_prefix": "${{ inputs.hostname-prefix }}",
+              "container_type": "${{ inputs.container-type }}",
+              "project": "${{ inputs.project }}",
+              "branch": "${{ inputs.branch }}"
             }
           timeout: ${{ inputs.job-timeout }}
           wait: true
