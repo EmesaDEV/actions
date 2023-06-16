@@ -93,12 +93,11 @@ jobs:
           retry_count=0
 
           while [ $retry_count -lt $max_retries ]; do
-            # Execute the command with a timeout
-            timeout $timeout_seconds $command_to_execute
+            # Execute the command with a timeout, store exit status
+            timeout $timeout_seconds $command_to_execute || exit_status=$?
 
-            # Check the exit status of the command
-            exit_status=$?
-            
+            # Check the exit status
+                        
             if [ $exit_status -eq 0 ]; then
               echo "Command executed successfully"
               break
