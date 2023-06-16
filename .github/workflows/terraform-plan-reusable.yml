@@ -86,6 +86,8 @@ jobs:
         run: |
           #!/bin/bash
 
+          set +e
+
           command_to_execute="terraform init  -upgrade -backend-config=backend-configs/${{ inputs.environment }}-backend.tfvars"
           timeout_seconds=300 # 5 minutes
           max_retries=3
@@ -94,9 +96,10 @@ jobs:
 
           while [ $retry_count -lt $max_retries ]; do
             # Execute the command with a timeout, store exit status
-            timeout $timeout_seconds $command_to_execute || exit_status=$?
+            timeout $timeout_seconds $command_to_execute
 
             # Check the exit status
+            exit_status=$?
 
             if [ $exit_status == 0 ]; then
               echo "Command executed successfully"
