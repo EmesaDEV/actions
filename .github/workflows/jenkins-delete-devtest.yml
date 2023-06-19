@@ -37,7 +37,7 @@ on:
 
 jobs:
   delete-onprem-env:
-    runs-on: ${{ fromJson(inputs.runs-on) }}
+    runs-on: ${{ inputs.runs-on }}
     steps:
       - name: Invoke Jenkins
         uses: estherk0/jenkins-trigger@28c29b61f13bdc3d46b4a6dc9b2a8248ed3c6f0e
