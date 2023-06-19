@@ -1,25 +1,20 @@
-name: Launch on-prem environment
+name: Delete on-prem environment
 
 on:
   workflow_call:
     inputs:
       hostname-prefix:
-        description: 'The hostname prefix of the new environment'
+        description: 'The hostname prefix of the environment to delete'
         required: true
         type: string
       container-type:
-        description: 'The type of the new environment'
+        description: 'The type of the environment to delete'
         required: true
         type: string
       project:
-        description: 'The project of the new environment'
+        description: 'The project of the environment to delete'
         required: true
         type: string
-      branch:
-        description: 'The branch of the application to checkout'
-        required: false
-        type: string
-        default: master
       job-timeout:
         description: 'Jenkins job timeout period. Default 600 seconds'
         required: false
@@ -41,7 +36,7 @@ on:
       
 
 jobs:
-  launch-onprem-env:
+  delete-onprem-env:
     runs-on: ${{ inputs.runs-on }}
     steps:
       - name: Invoke Jenkins
@@ -50,14 +45,12 @@ jobs:
           url: ${{ inputs.jenkins-url }}
           user_name: ${{ secrets.JENKINS_USER }}
           api_token: ${{ secrets.JENKINS_TOKEN }}
-          job_name: lxd-hammer-launch
+          job_name: lxd-hammer-delete
           parameter: |
             {
               "hostname_prefix": "${{ inputs.hostname-prefix }}",
               "container_type": "${{ inputs.container-type }}",
-              "project": "${{ inputs.project }}",
-              "branch": "${{ inputs.branch }}",
-              "developer": "jenkins"
+              "project": "${{ inputs.project }}"
             }
           timeout: ${{ inputs.job-timeout }}
           wait: true
