@@ -82,8 +82,15 @@ jobs:
 
           # echo the JSON list to $GITHUB_OUTPUT
           echo "environments=$json" >> $GITHUB_OUTPUT
+      - name: Get last commit
+        id: last-commit
+        run: |
+          #!/bin/bash
+          echo "last_commit=$(git log --pretty=format:"%an <%ae> - %cd - %s" --date=short | head -1)" >> $GITHUB_OUTPUT
+
     outputs:
       environments: ${{ steps.get-environments.outputs.environments }}
+      last-commit: ${{ steps.last-commit.outputs.last_commit }}
 
   terraform-check-drift:
     strategy:
@@ -107,9 +114,10 @@ jobs:
   
   notify:
     if: ${{ failure() }}
-    runs-on: ${{ github.event.repository.name }}
+    runs-on: ${{ inputs.runs-on }}
     needs:
       - terraform-check-drift 
+      - detect-envs
     steps:
       - name: Prepare slack contents
         id: slack-payload
@@ -276,7 +284,7 @@ jobs:
           channel-id: ${{ inputs.slack-channel }}
           payload: |
             {
-              "text": "A problem with ${{ github.repository }} is detected.",
+              "text": "A problem with ${{ github.repository }} is detected. \nLast commit:\n${{ needs.detect-envs.outputs.last-commit }}",
               "attachments": ${{ steps.slack-payload.outputs.slack-attachments }}
             }    
         env:
