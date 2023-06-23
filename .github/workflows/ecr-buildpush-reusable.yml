@@ -40,7 +40,6 @@ jobs:
   build-push:
     environment: ${{ inputs.environment }}
     runs-on: ${{ inputs.runs-on }}
-    concurrency: ${{ github.ref }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
