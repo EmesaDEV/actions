@@ -105,7 +105,6 @@ jobs:
       git-ref: ${{ inputs.git-ref }}
       lock: false
       environment: ${{ matrix.environment }}
-      concurrency-prefix: ${{ matrix.environment }}-${{ github.run_id }}-${{ github.run_attempt }}
       check-for-diff: true
       continue-on-error: false
       project-key: ${{ github.event.repository.name }}
