@@ -83,7 +83,7 @@ jobs:
       - name: "terraform-plan::${{ inputs.environment }}"
         id: plan
         run: |
-          terraform plan -lock=${{ inputs.lock }} -var-file=${{ inputs.environment }}.tfvars -detailed-exitcode -out=tfplan-${{ inputs.project-key }}-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }} || error_code=$?
+          terraform plan -lock=${{ inputs.lock }} -var-file=${{ inputs.environment }}.tfvars -detailed-exitcode -out=tfplan-${{ inputs.project-key }}-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_number }} || error_code=$?
           case $error_code in 
             0)
               echo "status=ok" >> $GITHUB_OUTPUT
@@ -106,5 +106,5 @@ jobs:
       - name: Upload tfplan for job "terraform-plan::${{ inputs.environment }}"
         uses: actions/upload-artifact@v3
         with:
-          name: tfplan-${{ inputs.project-key }}-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
-          path: tfplan-${{ inputs.project-key }}-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
+          name: tfplan-${{ inputs.project-key }}-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_number }}
+          path: tfplan-${{ inputs.project-key }}-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_number }}
