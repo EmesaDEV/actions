@@ -24,10 +24,15 @@ on:
         type: string
         default: "[AUTOMATED] Format terraform codebase"
       continue-on-error:
-        description: If true - continue on error'
+        description: If true - continue on error
         required: false
         type: boolean
         default: false
+      branch-name:
+        description: Name of the branch to commit
+        required: false
+        type: string
+        default: ${{ github.head_ref }} 
     secrets:
       PAT:
         description: PAT of system user (should be able to clone tf repos and pull/push to current repo)
@@ -47,7 +52,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.head_ref }}
+          ref: ${{ inputs.branch-name }}
           token: ${{ secrets.PAT }}
       - name: Terraform Format
         id: fmt
@@ -67,4 +72,4 @@ jobs:
         uses: ad-m/github-push-action@552c074ed701137ebd2bf098e70c394ca293e87f
         with:
           github_token: ${{ secrets.PAT }}
-          branch: ${{ github.head_ref }}
+          branch: ${{ inputs.branch-name }}
