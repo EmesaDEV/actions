@@ -38,6 +38,11 @@ on:
         required: false
         type: string
         default: .
+      branch-name:
+        description: Name of the branch to commit
+        required: false
+        type: string
+        default: ${{ github.head_ref }}
     secrets:
       PAT:
         description: PAT of system user (should be able to clone tf repos and pull/push to current repo)
@@ -54,7 +59,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.head_ref }}
+          ref: ${{ inputs.branch-name }}
           token: ${{ secrets.PAT }}
       - name: Checkout reusable workflow repo
         uses: actions/checkout@v3
