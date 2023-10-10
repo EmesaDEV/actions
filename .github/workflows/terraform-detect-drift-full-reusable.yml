@@ -87,7 +87,9 @@ jobs:
         run: |
           #!/bin/bash
           # get short log messages excluding lines where "[AUTOMATED]" is present, because it is a signature of bot..
-          echo "last_commit=$(git log --pretty=format:"%an <%ae> - %cd - %s" --date=short | grep -v ' - \[AUTOMATED\] ' | head -1)" >> $GITHUB_OUTPUT
+          last_commit="$(git log --pretty=format:"%an <%ae> - %cd - %s" --date=short | grep -vi ' - \[AUTOMATED\] ' | head -1)"
+          echo "Last commit details: $last_commit"
+          echo "last_commit=$last_commit" >> $GITHUB_OUTPUT
 
     outputs:
       environments: ${{ steps.get-environments.outputs.environments }}
