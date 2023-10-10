@@ -51,6 +51,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.git-ref }}
+
       - name: Get environments
         id: get-environments
         run: |
