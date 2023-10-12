@@ -89,7 +89,7 @@ jobs:
         run: |
           #!/bin/bash
           # get short log messages excluding lines where "[AUTOMATED]" is present, because it is a signature of bot..
-          last_commit="$(git log --pretty=format:"%an <%ae> - %cd - %s" --date=short | grep -vi ' - \[AUTOMATED\] ' | head -1)"
+          last_commit="$(git log --pretty=format:"%an <%ae> - %cd - %s" --date=short --invert-grep --grep='^\[AUTOMATED\]' --max-count=1)"
           echo "Last commit details: $last_commit"
           echo "last_commit=$last_commit" >> $GITHUB_OUTPUT
 
