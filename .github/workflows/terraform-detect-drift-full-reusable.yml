@@ -51,6 +51,8 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.git-ref }}
+          fetch-depth: 10  # in case if last commits are "[AUTOMATED] ..", bring a bit more..
+
       - name: Get environments
         id: get-environments
         run: |
@@ -78,7 +80,7 @@ jobs:
             json="$json\"$file\", "
           done <<< "$files"
           # remove the trailing comma and add the closing bracket
-          json="${json%, *}]" 
+          json="${json%, *}]"
 
           # echo the JSON list to $GITHUB_OUTPUT
           echo "environments=$json" >> $GITHUB_OUTPUT
@@ -86,7 +88,10 @@ jobs:
         id: last-commit
         run: |
           #!/bin/bash
-          echo "last_commit=$(git log --pretty=format:"%an <%ae> - %cd - %s" --date=short | head -1)" >> $GITHUB_OUTPUT
+          # get short log messages excluding lines where "[AUTOMATED]" is present, because it is a signature of bot..
+          last_commit="$(git log --pretty=format:"%an <%ae> - %cd - %s" --date=short --invert-grep --grep='^\[AUTOMATED\]' --max-count=1)"
+          echo "Last commit details: $last_commit"
+          echo "last_commit=$last_commit" >> $GITHUB_OUTPUT
 
     outputs:
       environments: ${{ steps.get-environments.outputs.environments }}
@@ -110,12 +115,12 @@ jobs:
       project-key: ${{ github.event.repository.name }}
     secrets:
       PAT: ${{ secrets.PAT }}
-  
+
   notify:
     if: ${{ failure() }}
     runs-on: ${{ inputs.runs-on }}
     needs:
-      - terraform-check-drift 
+      - terraform-check-drift
       - detect-envs
     steps:
       - name: Prepare slack contents
@@ -136,13 +141,13 @@ jobs:
             });
             const jobsInfo = jobsInfoRes.data;
 
-            for (const jobInfo of jobsInfo.jobs) { 
+            for (const jobInfo of jobsInfo.jobs) {
               const failedStepsInfo = jobInfo.steps.filter(s => s.conclusion === "failure");
-              for (const failedStepInfo of failedStepsInfo) { 
+              for (const failedStepInfo of failedStepsInfo) {
                 console.log( jobInfo.name, failedStepInfo.name, failedStepInfo.conclusion );
 
-                /* 
-                  For a job name like "terraform-check-drift (dev) / terraform-plan", 
+                /*
+                  For a job name like "terraform-check-drift (dev) / terraform-plan",
                   we need to extract env name, the job name may be truncated, so we look into ".. (dev) .." part
                 */
 
@@ -164,7 +169,7 @@ jobs:
                     ]
                   });
                   continue;
-                } 
+                }
 
                 const envName = match[1];
                 const jobLogs = await github.rest.actions.downloadJobLogsForWorkflowRun({
@@ -172,14 +177,14 @@ jobs:
                   repo: context.repo.repo,
                   job_id: jobInfo.id
                 });
-                // NOTE: ":0" is reponsible for a particular line in step log, ":0" will unfold log, but will point to its beginning, better 
+                // NOTE: ":0" is reponsible for a particular line in step log, ":0" will unfold log, but will point to its beginning, better
                 const stepDetailsUrl = "${{ github.server_url }}/${{ github.repository }}/runs/" + jobInfo.id + "?#step:" + failedStepInfo.number + ":0"
 
                 /*
                   Detect known errors, given that we know all step names in terraform-plan job
                 */
 
-                /* 
+                /*
                   Plan error or drift
                 */
 
@@ -190,10 +195,10 @@ jobs:
 
                   // There are some invisible symbols, so instead of regex, we split and remove all of them manually
                   const planDetails = (planLine.split("Plan:")[1] || "").trim();
-                  const planOutcome = planDetails 
+                  const planOutcome = planDetails
                     ? "Plan is " + planDetails.replace('[0m ', '').replace('\u001b', '').trim()
                     : "Plan preview is unavailable.";
-                  
+
                   if (isError) {
                     slackAttachments.push({
                       "color": "danger",
@@ -271,12 +276,12 @@ jobs:
                   ]
                 });
                 continue;
-              } 
+              }
             }
             slackAttachmentsJSON = JSON.stringify(slackAttachments, null, 2);
             console.log(slackAttachmentsJSON);
             core.setOutput("slack-attachments", slackAttachmentsJSON );
-            
+
       - name: Post to a Slack channel
         uses: slackapi/slack-github-action@v1.23.0
         with:
@@ -285,6 +290,6 @@ jobs:
             {
               "text": "A problem with ${{ github.repository }} is detected. \nLast commit:\n${{ needs.detect-envs.outputs.last-commit }}",
               "attachments": ${{ steps.slack-payload.outputs.slack-attachments }}
-            }    
+            }
         env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}    
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
