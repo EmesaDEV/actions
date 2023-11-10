@@ -24,6 +24,7 @@ on:
         description: 'The option to run the setup-dev command'
         required: false
         type: boolean
+        default: false
       job-timeout:
         description: 'Jenkins job timeout period. Default 600 seconds'
         required: false
