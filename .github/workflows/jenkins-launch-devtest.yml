@@ -20,6 +20,11 @@ on:
         required: false
         type: string
         default: master
+      setup-dev:
+        description: 'The option to run the setup-dev command'
+        required: false
+        type: boolean
+        default: false
       job-timeout:
         description: 'Jenkins job timeout period. Default 600 seconds'
         required: false
@@ -57,6 +62,7 @@ jobs:
               "container_type": "${{ inputs.container-type }}",
               "project": "${{ inputs.project }}",
               "branch": "${{ inputs.branch }}",
+              "setup_dev": "${{ inputs.setup-dev }}",
               "developer": "jenkins"
             }
           timeout: ${{ inputs.job-timeout }}
