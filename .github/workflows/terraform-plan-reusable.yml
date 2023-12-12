@@ -108,3 +108,8 @@ jobs:
         with:
           name: tfplan-${{ inputs.project-key }}-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_number }}
           path: tfplan-${{ inputs.project-key }}-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_number }}
+      - name: Upload artifacts for job "terraform-plan::${{ inputs.environment }}"
+        uses: actions/upload-artifact@v3
+        with:
+          name: artifacts
+          path: artifacts
