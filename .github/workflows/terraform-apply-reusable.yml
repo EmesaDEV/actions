@@ -62,8 +62,12 @@ jobs:
       - name: Download tfplan for job "terraform-plan::${{ inputs.environment }}"
         uses: actions/download-artifact@v3
         with:
-          name: tfplan-${{ inputs.project-key }}-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_number }}
+          name: tfplan-${{ inputs.project-key }}-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_number }}  
+      - name: Download artifacts for job "terraform-plan::${{ inputs.environment }}"
+        uses: actions/download-artifact@v3
+        with:
+          name: artifacts
+          path: artifacts
       - name: "terraform-apply::${{ inputs.environment }}"
         id: apply
-        run: |
-          terraform apply -input=false tfplan-${{ inputs.project-key }}-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_number }}
+        run: terraform apply -input=false tfplan-${{ inputs.project-key }}-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_number }}
