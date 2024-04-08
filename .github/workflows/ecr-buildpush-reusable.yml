@@ -12,6 +12,10 @@ on:
         description: docker image tags
         required: true
         type: string
+      CACHE_TAG:
+        description: docker image tags
+        required: true
+        type: string
       CONTEXT:
         description: "Build's context is the set of files located in the specified PATH"
         required: false
@@ -42,7 +46,7 @@ jobs:
     runs-on: ${{ inputs.runs-on }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -51,7 +55,7 @@ jobs:
           aws-region: ${{ inputs.AWS_REGION }}
       - name: Login to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+        uses: aws-actions/amazon-ecr-login@v2
         with:
           registries: "${{ vars.AWS_ACCOUNT_ID }}"
       - name: Set up Docker Context for Buildx
@@ -63,9 +67,12 @@ jobs:
         with:
           endpoint: builders
       - name: Build and push Docker image
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v5
         with:
           context: ${{ inputs.CONTEXT }}
           file: ${{ inputs.CONTEXT }}/Dockerfile
           push: true
           tags: ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com/${{ inputs.TAGS }}
+          cache-to: mode=max,image-manifest=true,oci-mediatypes=true,type=registry,ref=${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com/${{ inputs.CACHE_TAG }}
+          cache-from: type=registry ref=${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com/${{ inputs.CACHE_TAG }}
+
