@@ -8,11 +8,15 @@ on:
         required: false
         type: string
         default: ubuntu-latest
-      TAGS:
-        description: docker image tags
+      tag:
+        description: the tag of the image
         required: true
         type: string
-      CONTEXT:
+      repo-name:
+        description: the repo name for the image
+        required: true
+        type: string
+      context:
         description: "Build's context is the set of files located in the specified PATH"
         required: false
         type: string
@@ -30,7 +34,7 @@ on:
         description: 'The terraform environment'
         required: true
         type: string
-      AWS_REGION:
+      aws-region:
         description: AWS region
         required: false
         type: string
@@ -53,7 +57,7 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/github-actions-${{ inputs.project-key }}-${{ inputs.environment }}
           role-session-name: ${{ inputs.project-key }}-${{ inputs.environment }}
-          aws-region: ${{ inputs.AWS_REGION }}
+          aws-region: ${{ inputs.aws-region }}
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
@@ -70,7 +74,10 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ${{ inputs.CONTEXT }}
-          file: ${{ inputs.CONTEXT }}/${{ inputs.file }}
+          context: ${{ inputs.context }}
+          file: ${{ inputs.context }}/${{ inputs.file }}
           push: true
-          tags: ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com/${{ inputs.TAGS }}
+          tags: ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.aws-region }}.amazonaws.com/${{ inputs.repo-name }}:${{ inputs.tag }}
+          cache-to: mode=max,image-manifest=true,oci-mediatypes=true,type=registry,ref=${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.aws-region }}.amazonaws.com/${{ inputs.repo-name }}:build-cache
+          cache-from: type=registry,ref=${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.aws-region }}.amazonaws.com/${{ inputs.repo-name }}:build-cache
+
