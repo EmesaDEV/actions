@@ -1,0 +1,61 @@
+name: Down Merge
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: The environment
+        type: string
+        required: true
+      from-branch:
+        description: The branch that is merged
+        type: string
+        required: true
+      skip-notifications:
+        description: Skip the notifications
+        type: boolean
+        required: false
+        default: true
+
+jobs:
+  downmerge:
+    name: Downmerge
+    runs-on: ${{ github.event.repository.name }}
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get branch name
+        id: branch-name
+        uses: tj-actions/branch-names@v7.0.7
+
+      - name: Configure git
+        if: github.ref_name != 'master'
+        run: |
+          git config --global user.name ${{ secrets.MERGE_USER }}
+          git config --global user.email ${{ secrets.MERGE_USER_EMAIL }}
+          git fetch
+          git checkout master && git pull
+          git checkout ${{ steps.branch-name.outputs.current_branch }}
+
+      - name: Downmerge master
+        id: downmerge-master
+        if: github.ref_name != 'master'
+        run: git merge --no-ff origin/master -m "origin/${{ inputs.from-branch }} downmerged to $${{ steps.branch-name.outputs.current_branch }}"
+
+      - name: Push changes
+        uses: ad-m/github-push-action@v0.8.0
+        with:
+          branch: ${{ github.head_ref || github.ref_name }}
+
+      - name: Notifications
+        uses: EmesaDEV/actions/.github//notifications/jira-comment/
+        if: ${{ !inputs.skip-notifications }}
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        with:
+          issue: ${{ steps.branch-name.outputs.current_branch }}
+          comment: "Master was downmerged into this ticket (requested by @${{ github.actor }}). Result was: ${{ steps.downmerge-master.outputs.short-hash }}\n\n Check the details on ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
