@@ -50,7 +50,7 @@ jobs:
           branch: ${{ github.head_ref || github.ref_name }}
 
       - name: Notifications
-        uses: EmesaDEV/actions/.github//notifications/jira-comment/
+        uses: EmesaDEV/actions/.github/notifications/jira-comment/@v0.21.0
         if: ${{ !inputs.skip-notifications }}
         env:
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
