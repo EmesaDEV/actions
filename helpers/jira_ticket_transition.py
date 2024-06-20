@@ -3,11 +3,10 @@ pip install jira
 """
 import os
 
-from .helper import Helper
 from jira import JIRA
 
 
-class JiraTicketTransition(Helper):
+class JiraTicketTransition():
     def execute(self):
         issue_key = os.getenv('ISSUE_KEY')
         comment = os.getenv('COMMENT', None)
