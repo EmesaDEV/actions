@@ -9,7 +9,6 @@ from jira.exceptions import JIRAError
 
 class JiraTicketComment():
     def execute(self):
-        context_env = os.getenv('CONTEXT_ENV')
         issue_key = os.getenv('ISSUE_KEY')
         comment = os.getenv('COMMENT')
 

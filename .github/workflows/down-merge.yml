@@ -55,12 +55,10 @@ jobs:
 
       - name: Notifications
         if: ${{ !inputs.skip-notifications }}
-        env:
+        uses: EmesaDEV/actions/jira-comment@HMR-31567
+        with:
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
           JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-          ISSUE_KEY: ${{ steps.branch-name.outputs.current_branch }}
-          COMMENT: "Master was downmerged into this ticket (requested by @${{ github.actor }}). Result was: ${{ steps.downmerge-master.outputs.short-hash }}\n\n Check the details on ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-        run: | 
-            pip install jira
-            python -m helpers.jira_comment.py
+          issue: ${{ steps.branch-name.outputs.current_branch }}
+          comment: "Master was downmerged into this ticket (requested by @${{ github.actor }}). Result was: ${{ steps.downmerge-master.outputs.short-hash }}\n\n Check the details on ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

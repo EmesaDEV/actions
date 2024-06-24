@@ -22,12 +22,16 @@ inputs:
 
 outputs:
   current_branch: 
+    description: the current branch
     value: ${{ steps.branch-names.outputs.current_branch }}
   run_url: 
+    description: the run url
     value: ${{ steps.set-run-url.outputs.url }}
   issue_url: 
+    description: the issue url
     value: ${{ steps.validate-ticket.outputs.issue_url }}
   issue_summary: 
+    description: the issue summary
     value: ${{ steps.validate-ticket.outputs.issue_summary }}
 
 runs:
