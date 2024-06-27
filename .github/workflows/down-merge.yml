@@ -55,7 +55,7 @@ jobs:
 
       - name: Notifications
         if: ${{ !inputs.skip-notifications }}
-        uses: EmesaDEV/actions/jira-comment@HMR-31567
+        uses: EmesaDEV/actions/jira-comment@v0.22.0
         with:
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
           JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}

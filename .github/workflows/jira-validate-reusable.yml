@@ -34,14 +34,14 @@ jobs:
         uses: tj-actions/branch-names@v8.0.1
       - name: Validate ticket
         id: validate-ticket
-        uses: EmesaDEV/actions/jira-validate@HMR-31567
+        uses: EmesaDEV/actions/jira-validate@v0.22.0
         with:
           CONTEXT_ENV: ${{ inputs.CONTEXT_ENV }}
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
           JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
       - name: Transition to Merged
-        uses: EmesaDEV/actions/jira-transition@HMR-31567
+        uses: EmesaDEV/actions/jira-transition@v0.22.0
         with:
           issue: ${{ steps.branch-names.outputs.current_branch }}
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
