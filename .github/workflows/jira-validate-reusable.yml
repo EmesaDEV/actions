@@ -27,56 +27,25 @@ jobs:
     runs-on: ${{ inputs.runs-on }}
     outputs:
       current_branch: ${{ steps.branch-names.outputs.current_branch }}
-      issue_id: ${{ steps.set-run-artefacts.outputs.issue_id }}
-      is_revert: ${{ steps.set-run-artefacts.outputs.is_revert }}
-      run_url: ${{ steps.set-run-url.outputs.url }}
-      issue_url: ${{ steps.validate-ticket.outputs.issue_url }}
-      issue_summary: ${{ steps.validate-ticket.outputs.issue_summary }}
+      run_url: ${{ steps.validate-ticket.outputs.run_url }}
     steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-python@v2
-        with:
-          python-version: '3.9'
       - name: Get branch names
         id: branch-names
-        uses: tj-actions/branch-names@v5.2
-      - name: Set run artefacts
-        id: set-run-artefacts
-        env:
-          BRANCH: ${{ steps.branch-names.outputs.current_branch }}
-        run: |
-          python -m helpers.set_run_artefacts
-      - name: Get run url
-        id: set-run-url
-        run: |
-          url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          echo "::set-output name=url::$url"
-      - name: Set last commit data
-        id: set-last-commit-date
-        run: |
-          last_commit_date=$(TZ=gmt git show -s --date=format-local:'%Y-%m-%d %H:%M' --format=%cd $(git rev-parse origin/${{ steps.branch-names.outputs.current_branch }}))
-          echo "::set-output name=last_commit_date::$last_commit_date"
+        uses: tj-actions/branch-names@v8.0.1
       - name: Validate ticket
         id: validate-ticket
-        env:
-          ISSUE_KEY: ${{ steps.set-run-artefacts.outputs.issue_id }}
-          LAST_COMMIT_DATE: ${{ steps.set-last-commit-date.outputs.last_commit_date }}
+        uses: EmesaDEV/actions/jira-validate@v0.22.0
+        with:
           CONTEXT_ENV: ${{ inputs.CONTEXT_ENV }}
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
           JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-        run: |
-          pip install jira
-          python -m helpers.jira_ticket_validation
       - name: Transition to Merged
-        env:
-          ISSUE_KEY: ${{ steps.set-run-artefacts.outputs.issue_id }}
+        uses: EmesaDEV/actions/jira-transition@v0.22.0
+        with:
+          issue: ${{ steps.branch-names.outputs.current_branch }}
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
           JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-          COMMENT: Ticket merged with master via ${{ steps.set-run-url.outputs.url }}
+          comment: Ticket merged with master via ${{ steps.validate-ticket.outputs.run_url }}
           STATUS: Merged
-        run: |
-          python -m helpers.jira_ticket_transition

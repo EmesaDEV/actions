@@ -49,13 +49,16 @@ jobs:
         with:
           branch: ${{ github.head_ref || github.ref_name }}
 
+      - uses: actions/setup-python@v2
+        with:
+            python-version: '3.9'
+
       - name: Notifications
-        uses: EmesaDEV/actions/.github/notifications/jira-comment/@v0.21.0
         if: ${{ !inputs.skip-notifications }}
-        env:
+        uses: EmesaDEV/actions/jira-comment@v0.22.0
+        with:
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
           JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-        with:
           issue: ${{ steps.branch-name.outputs.current_branch }}
           comment: "Master was downmerged into this ticket (requested by @${{ github.actor }}). Result was: ${{ steps.downmerge-master.outputs.short-hash }}\n\n Check the details on ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
