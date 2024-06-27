@@ -1,24 +1,19 @@
 name: Validate Jira ticket
+description: Validates that the JIRA ticket has no blockers, is in ready for merge and moved to reviewed after the last commit
 
 inputs:
-  runs-on:
-    description: The type of machine to run the job on. The machine can be either a GitHub-hosted runner, or a self-hosted runner.
-    required: false
-    type: string
-    default: ubuntu-latest
   CONTEXT_ENV:
     description: Dev or Test env
     required: true
-    type: string
   JIRA_BASE_URL: 
+    description: The base url to query jira
     required: true
-    type: string
-  JIRA_USER_EMAIL:     
+  JIRA_USER_EMAIL:
     required: true
-    type: string
+    description: The email to log in to jira with
   JIRA_API_TOKEN:     
     required: true
-    type: string
+    description: The api token to authenticate with jira
 
 outputs:
   current_branch: 
@@ -30,9 +25,12 @@ outputs:
   issue_url: 
     description: the issue url
     value: ${{ steps.validate-ticket.outputs.issue_url }}
-  issue_summary: 
-    description: the issue summary
-    value: ${{ steps.validate-ticket.outputs.issue_summary }}
+  issue_developer: 
+    description: the developer
+    value: ${{ steps.validate-ticket.outputs.issue_developer }}
+  issue_reporter:
+    description: the issue's reporter
+    value: ${{ steps.validate-ticket.outputs.issue_reporter }}
 
 runs:
   using: "composite"
@@ -43,18 +41,25 @@ runs:
         python-version: '3.9'
     - name: Get branch names
       id: branch-names
-      uses: tj-actions/branch-names@v5.2
+      uses: tj-actions/branch-names@v8.0.1
     - name: Get run url
       id: set-run-url
       shell: bash
       run: |
         url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-        echo "RUN_URL=$url" >> $ $GITHUB_OUTPUT
+        echo "RUN_URL=$url" >> "$GITHUB_OUTPUT"
+    - name: Set last commit data
+      id: set-last-commit-date
+      shell: bash
+      run: |
+        last_commit_date=$(TZ=gmt git show -s --date=format-local:'%Y-%m-%d %H:%M' --format=%cd )
+        echo "LAST_COMMIT_DATE=$last_commit_date" >> "$GITHUB_OUTPUT"
     - name: Validate ticket
       id: validate-ticket
       shell: bash
       env:
         ISSUE_KEY: ${{ steps.branch-names.outputs.current_branch }}
+        LAST_COMMIT_DATE: ${{ steps.set-last-commit-date.outputs.LAST_COMMIT_DATE }}
         CONTEXT_ENV: ${{ inputs.CONTEXT_ENV }}
         JIRA_BASE_URL: ${{ inputs.JIRA_BASE_URL }}
         JIRA_USER_EMAIL: ${{ inputs.JIRA_USER_EMAIL }}

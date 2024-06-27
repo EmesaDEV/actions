@@ -24,7 +24,7 @@ jobs:
   validate-ticket:
     runs-on: ${{ inputs.runs-on }}
     steps:
-      - uses: EmesaDEV/actions/jira-validate-dev@HMR-31567
+      - uses: EmesaDEV/actions/jira-validate@HMR-31567
         with:
           CONTEXT_ENV: ${{ inputs.CONTEXT_ENV }}
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}

@@ -8,9 +8,7 @@ from jira.exceptions import JIRAError
 
 
 class JiraTicketValidation():
-    
-    set_output = {}
-    
+        
     def execute(self):
         context_env = os.getenv('CONTEXT_ENV')
         issue_key = os.getenv('ISSUE_KEY')
