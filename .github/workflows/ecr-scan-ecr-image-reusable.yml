@@ -1,0 +1,35 @@
+name: ECR scan image reusable workflow
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: The type of machine to run the job on. The machine can be either a GitHub-hosted runner, or a self-hosted runner.
+        required: false
+        type: string
+        default: ubuntu-latest
+      tag:
+        description: the tag of the image
+        required: true
+        type: string
+      repo-name:
+        description: the repo name for the image
+        required: true
+        type: string
+      fail-treshold:
+        required: false
+        type: string
+        description: "Fail if any vulnerabilities equal to or over this severity level are detected. Valid values: critical, high, medium, low, informational"
+        default: critical
+
+jobs:
+  scan-image:
+    runs-on: ${{ inputs.runs-on }}
+    steps:
+      - name: Scan Docker image
+        id: docker-scan
+        uses: alexjurkiewicz/ecr-scan-image@v2.0.1
+        with:
+          repository: ${{ inputs.repo-name }}
+          tag: ${{ inputs.tag }}
+          fail_threshold: ${{ inputs.fail-treshold }}
