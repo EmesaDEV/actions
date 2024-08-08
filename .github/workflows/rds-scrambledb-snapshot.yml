@@ -1,0 +1,530 @@
+name: 'Create rds scrambledb snapshot'
+
+on:
+  workflow_call:
+    inputs:
+      run-scramble:
+        required: false
+        description: 'Run scramble script before creating snapshot'
+        type: boolean
+        default: true
+      scramble-file-path:
+        required: false
+        description: 'The path of the scramble file'
+        type: string
+        default: 'tools/scramble.sql'
+      namespace:
+        required: true
+        description: 'The namespace of the scrambler deployment'
+        type: string
+      runs-on:
+        required: true
+        description: 'The runner label'
+        type: string
+      db-instance:
+        required: true
+        description: 'The db instance to snapshot'
+        type: string
+      project:
+        required: true
+        description: 'The project name'
+        type: string
+      aws-region:
+        description: AWS region
+        required: false
+        type: string
+        default: eu-central-1
+      cell-name:
+        description: 'The cell name'
+        required: true
+        type: string
+      aws-account-id-prod:
+        description: 'The AWS account id of the production account'
+        required: false
+        type: string
+      aws-account-id-test:
+        description: 'The AWS account id of the test account'
+        required: false
+        type: string
+      rds-instance-class:
+        description: 'The RDS instance class'
+        required: false
+        type: string
+        default: "db.t4g.small"
+      db-subnet-group-name:
+        description: 'The db subnet group name'
+        required: false
+        type: string
+      db-security-group-id:
+        description: 'The db security group id'
+        required: false
+        type: string
+      rds-password:
+        description: 'The temporary RDS password'
+        required: false
+        type: string
+      rds-database:
+        description: 'The RDS database name'
+        required: true
+        type: string
+      test-db-username:
+        description: 'The test db username'
+        required: false
+        type: string
+        default: 'root'
+      test-db-password:
+        description: 'The test db password'
+        required: false
+        type: string
+        default: 'root'
+      keep-max-snapshots:
+        description: 'The maximum number of snapshots to keep'
+        required: false
+        type: number
+        default: 5
+      timeout-minutes-rds-snapshot-completion:
+        description: Wait for snapshot completion
+        required: false
+        type: number
+        default: 10
+      timeout-minutes-instance-creation:
+        description: Wait for instance creation
+        required: false
+        type: number
+        default: 15
+      timeout-minutes-instance-modification:
+        description: Wait for instance modifications
+        required: false
+        type: number
+        default: 15
+      timeout-minutes-local-connection:
+        description: Check local/k8s connection
+        required: false
+        type: number
+        default: 10
+      timeout-minutes-rds-connection:
+        description: Check remote/rds connection
+        required: false
+        type: number
+        default: 10
+      timeout-minutes-volume-snapshop-completion:
+        description: Wait snapshot ready
+        required: false
+        type: number
+        default: 10
+
+permissions:
+  id-token: write
+  contents: write
+  packages: read
+
+jobs:
+  create-snapshot:
+    runs-on: ${{ inputs.runs-on }}
+    outputs:
+      rds-engine-version: ${{ steps.variables.outputs.rds-engine-version }}
+      rds-allocated-storage: ${{ steps.variables.outputs.rds-allocated-storage }}
+      rds-snapshot-id: ${{ steps.variables.outputs.rds-snapshot-id }}
+    environment:
+      name: prod
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-session-name: scrambler-prod
+          role-to-assume: "arn:aws:iam::${{ inputs.aws-account-id-prod }}:role/github-actions-${{ inputs.project }}-prod"
+          aws-region: ${{ inputs.aws-region }}
+      - name: Determine variables
+        id: variables
+        run: |
+          echo "rds-snapshot-id=${{ inputs.db-instance }}-$(date '+%Y%m%d-%H%M%S')" >> "$GITHUB_OUTPUT"            
+          echo "rds-engine-version=$(aws rds describe-db-instances --db-instance-identifier ${{ inputs.db-instance }} --output json | jq -r '.DBInstances[0].EngineVersion')" >> "$GITHUB_OUTPUT"
+          echo "rds-allocated-storage=$(aws rds describe-db-instances --db-instance-identifier ${{ inputs.db-instance }} --output json | jq -r '.DBInstances[0].AllocatedStorage')" >> "$GITHUB_OUTPUT"
+      - name: Create snapshot
+        run: |
+          aws rds create-db-snapshot \
+               --db-instance-identifier ${{ inputs.db-instance }} \
+               --db-snapshot-identifier ${{ steps.variables.outputs.rds-snapshot-id }} \
+               --tags Key=project,Value=${{ inputs.project }} Key=purpose,Value=scrambledb Key=emesa:cell,Value=${{ inputs.cell-name }} Key=emesa:automation-tool,Value=gha Key=emesa:repo,Value=${{ github.event.repository.name }}
+      - name: Wait for snapshot completion
+        timeout-minutes: ${{ inputs.timeout-minutes-rds-snapshot-completion }}
+        run: |
+          while true; do
+            status=$(aws rds describe-db-snapshots --db-snapshot-identifier ${{ steps.variables.outputs.rds-snapshot-id }} --query 'DBSnapshots[0].Status' --output text)
+            echo $status
+            if [ "$status" = "available" ]; then
+              break
+            fi
+            echo "Waiting for snapshot to be available"
+            sleep 10
+          done
+      - name: Modify snapshot tags
+        run: |
+          aws rds modify-db-snapshot-attribute \
+              --db-snapshot-identifier ${{ steps.variables.outputs.rds-snapshot-id }} \
+              --attribute-name restore \
+              --values-to-add ${{ inputs.aws-account-id-test }}
+
+  restore-on-test:
+    needs: create-snapshot
+    runs-on: ${{ inputs.runs-on }}
+    environment:
+      name: test
+    outputs:
+      rds-master-username: ${{ steps.variables.outputs.rds-master-username }}
+      rds-host: ${{ steps.variables.outputs.rds-host }}
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-session-name: scrambler-test
+          role-to-assume: "arn:aws:iam::${{ inputs.aws-account-id-test }}:role/github-actions-${{ inputs.project }}-test"
+          aws-region: eu-central-1
+      - name: Delete rds instance if exists
+        continue-on-error: true
+        run: |
+          echo "Deleting RDS instance if exists and waiting 5 minutes for it to be deleted"
+          aws rds delete-db-instance \
+              --db-instance-identifier ${{ inputs.db-instance }}-scrambling \
+              --skip-final-snapshot && sleep 300
+      - name: Restore snapshot
+        env:
+          snapshot-identifier: arn:aws:rds:${{ inputs.aws-region }}:${{ inputs.aws-account-id-prod }}:snapshot:${{ needs.create-snapshot.outputs.rds-snapshot-id }}
+        run: |
+          aws rds restore-db-instance-from-db-snapshot \
+              --db-snapshot-identifier ${{ env.snapshot-identifier }} \
+              --db-instance-identifier ${{ inputs.db-instance }}-scrambling \
+              --no-multi-az \
+              --db-instance-class ${{ inputs.rds-instance-class }} \
+              --no-publicly-accessible \
+              --no-auto-minor-version-upgrade \
+              --no-deletion-protection \
+              --db-subnet-group-name ${{ inputs.db-subnet-group-name }} \
+              --vpc-security-group-ids ${{ inputs.db-security-group-id }} \
+              --copy-tags-to-snapshot \
+              --tags Key=project,Value=${{ inputs.project }} Key=purpose,Value=scrambledb Key=emesa:cell,Value=Seller-Portal Key=emesa:automation-tool,Value=gha Key=emesa:repo,Value=${{ github.event.repository.name }} Key=map-migrated,Value=d-server-01itgqyvdh1qbj
+      - name: Wait for instance creation
+        timeout-minutes: ${{ inputs.timeout-minutes-instance-creation }}
+        run: |
+          while true; do
+          echo "Checking instance status"
+          status=$(aws rds describe-db-instances --db-instance-identifier ${{ inputs.db-instance }}-scrambling --query 'DBInstances[0].DBInstanceStatus' --output text)
+          echo $status;
+          if [ "$status" = "available" ]; then
+              break
+          fi
+          echo "Waiting for instance to be available"
+          sleep 10
+          done
+      - name: Determine details
+        id: variables
+        run: |
+          echo "rds-master-username=$(aws rds describe-db-instances --db-instance-identifier ${{ inputs.db-instance }}-scrambling --output json | jq -r '.DBInstances[0].MasterUsername')" >> "$GITHUB_OUTPUT"
+          echo "rds-host=$(aws rds describe-db-instances --db-instance-identifier ${{ inputs.db-instance }}-scrambling --output json | jq -r '.DBInstances[0].Endpoint.Address')" >> "$GITHUB_OUTPUT"
+      - name: Modify database
+        run: |
+          aws rds modify-db-instance \
+              --db-instance-identifier ${{ inputs.db-instance }}-scrambling \
+              --apply-immediately \
+              --master-user-password '${{ inputs.rds-password }}' \
+              --backup-retention-period 0 \
+              --no-auto-minor-version-upgrade
+      - name: Wait for instance modifications
+        timeout-minutes: ${{ inputs.timeout-minutes-instance-modification }}
+        run: |
+          sleep 30
+          while true; do
+          echo "Checking instance status"
+          status=$(aws rds describe-db-instances --db-instance-identifier ${{ inputs.db-instance }}-scrambling --query 'DBInstances[0].DBInstanceStatus' --output text)
+          echo $status;
+          if [ "$status" = "available" ]; then
+              break
+          fi
+          echo "Waiting for instance to be available"
+          sleep 10
+          done
+
+  scramble-instance:
+    runs-on: ${{ inputs.runs-on }}
+    environment:
+      name: test
+    needs:
+      - create-snapshot
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-session-name: scrambler-test
+          role-to-assume: "arn:aws:iam::${{ inputs.aws-account-id-test }}:role/github-actions-${{ inputs.project }}-test"
+          aws-region: eu-central-1
+      - uses: actions/checkout@v4
+      - name: Create kubeconfig
+        run: aws eks --region ${{ inputs.aws-region }} update-kubeconfig --name Emesa-Eks-Test-1
+      - name: AWS ECR login
+        run: aws ecr get-login-password --region ${{ inputs.aws-region }} | helm registry login --username AWS --password-stdin 669370964720.dkr.ecr.${{ inputs.aws-region }}.amazonaws.com
+      - name: Authenticate ECR for Kafka Bridge
+        run: aws ecr get-login-password --region ${{ inputs.aws-region }} | helm registry login --username AWS --password-stdin 088457204847.dkr.ecr.${{ inputs.aws-region }}.amazonaws.com
+      - name: Install mariadb
+        run: |
+          helm upgrade --wait \
+            --install \
+            --timeout 10m \
+            --set phpmyadmin.enabled=false \
+            --set mariadb.image.tag='${{ needs.create-snapshot.outputs.rds-engine-version }}' \
+            --set env.MYSQL_DATABASE='${{ inputs.rds-database }}' \
+            --set env.MYSQL_ROOT_PASSWORD='${{ inputs.test-db-password }}' \
+            --set env.MYSQL_USER='scrambledb' \
+            --set env.MYSQL_PASSWORD='${{ inputs.test-db-password }}' \
+            --set mariadb.probes.liveness.initialDelaySeconds=300 \
+            --set mariadb.probes.readiness.initialDelaySeconds=30 \
+            --set mariadb.pvc.enabled=true \
+            --set mariadb.pvc.className=gp3-high-throughput \
+            --set mariadb.pvc.size=${{ needs.create-snapshot.outputs.rds-allocated-storage }}Gi \
+            --set mariadb.resources.limits.cpu=2 \
+            --set mariadb.resources.limits.memory=8Gi \
+            --set mariadb.resources.requests.cpu=1 \
+            --set mariadb.resources.requests.memory=2Gi \
+            --set mariadb.args='{--innodb_flush_method=nosync,--innodb_flush_log_at_trx_commit=0,--innodb_buffer_pool_size=1G}' \
+            --set tolerations[0].effect=NoSchedule \
+            --set tolerations[0].key=taint \
+            --set tolerations[0].operator=Equal \
+            --set tolerations[0].value=scrambledb \
+            --create-namespace \
+            --namespace ${{ inputs.namespace }} \
+            ${{ inputs.namespace }} oci://669370964720.dkr.ecr.eu-central-1.amazonaws.com/mariadb
+
+  create-db-volume-snapshot:
+    runs-on: ${{ inputs.runs-on }}
+    environment:
+      name: test
+    needs:
+      - scramble-instance
+      - restore-on-test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create client config rds
+        run: |
+          echo '[client]'                            > .my.cnf.scrambled
+          echo 'host = ${{ needs.restore-on-test.outputs.rds-host }}'          >> .my.cnf.scrambled
+          echo 'user = ${{ needs.restore-on-test.outputs.rds-master-username }}'>> .my.cnf.scrambled
+          echo 'password = ${{ inputs.rds-password }}'  >> .my.cnf.scrambled
+      - name: Create client config k8s
+        run: |
+          echo '[client]'                             > .my.cnf.docker
+          echo 'host = localhost'                    >> .my.cnf.docker
+          echo 'user = root'                         >> .my.cnf.docker
+          echo 'password = ${{ inputs.test-db-password }}'>> .my.cnf.docker
+      - name: Create dummy scramble script
+        run: |
+          echo 'select 1;'                              > scramble.sql
+      - name: Copy scramble script from repo
+        if: ${{ inputs.run-scramble }}
+        run: cp ${{ inputs.scramble-file-path }} scramble.sql
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-session-name: scrambler-test
+          role-to-assume: "arn:aws:iam::${{ inputs.aws-account-id-test }}:role/github-actions-${{ inputs.project }}-test"
+          aws-region: eu-central-1
+      - name: Create kubeconfig
+        run: aws eks --region ${{ inputs.aws-region }} update-kubeconfig --name Emesa-Eks-Test-1
+      - name: Determine mariadb pod
+        id: mariaPod
+        run: |
+          export mariadbPod=$(kubectl -n ${{ inputs.namespace }} get pods -l app.kubernetes.io/name=mariadb -o jsonpath='{.items[0].metadata.name}')
+          echo "Found mariadb pod: $mariadbPod"
+          echo "mariadbPod=${mariadbPod}" >> "$GITHUB_OUTPUT"
+      - name: Copy config
+        run: |
+          kubectl -n ${{ inputs.namespace }} cp .my.cnf.scrambled  ${{ steps.mariaPod.outputs.mariadbPod }}:/root/.my.cnf.scrambled
+          kubectl -n ${{ inputs.namespace }} cp .my.cnf.docker ${{ steps.mariaPod.outputs.mariadbPod }}:/root/.my.cnf.docker
+      - name: Copy scramble script
+        if: ${{ inputs.run-scramble }}
+        run: |
+          kubectl -n ${{ inputs.namespace }} cp scramble.sql ${{ steps.mariaPod.outputs.mariadbPod }}:/root/scramble.sql
+      - name: Check local connection
+        run: |
+          mysql --defaults-file=.my.cnf.scrambled -e 'select 1;' || true
+      - name: Check local/k8s connection
+        timeout-minutes: ${{ inputs.timeout-minutes-local-connection }}
+        run: |
+          while true; do
+            kubectl -n ${{ inputs.namespace }} exec ${{ steps.mariaPod.outputs.mariadbPod }} -- mysqladmin --defaults-file=/root/.my.cnf.docker status
+            if [ $? -eq 0 ]; then
+              break
+            fi          
+            echo "No connection, waiting"
+            sleep 5
+          done
+      - name: Check remote/rds connection
+        timeout-minutes: ${{ inputs.timeout-minutes-rds-connection }}
+        run: |
+          while true; do
+            kubectl -n ${{ inputs.namespace }} exec ${{ steps.mariaPod.outputs.mariadbPod }} -- mysql --defaults-file=/root/.my.cnf.scrambled ${{ inputs.rds-database }} -e "select 1"
+            if [ $? -eq 0 ]; then
+              break
+            fi
+            echo "No connection, waiting"
+            sleep 5
+          done
+      - name: Scramble database
+        if: ${{ inputs.run-scramble }}
+        run: |
+          kubectl -n ${{ inputs.namespace }} exec ${{ steps.mariaPod.outputs.mariadbPod }} -- sh -c 'mysql --defaults-file=/root/.my.cnf.scrambled ${{ inputs.rds-database }} < /root/scramble.sql'
+      - name: Create mysqldump file from RDS
+        run: |
+          kubectl -n ${{ inputs.namespace }} exec ${{ steps.mariaPod.outputs.mariadbPod }} -- bash -c "mysqldump \
+            --defaults-file=/root/.my.cnf.scrambled \
+            --net-buffer-length=16M \
+            --max-allowed-packet=1024M \
+            --single-transaction \
+            --skip-lock-tables \
+            --add-drop-database \
+            --create-options \
+            --databases ${{ inputs.rds-database }} | gzip -c > /dump.sql.gz"
+      - name: Restore mysqldump to database in pod
+        # tail +2 is needed for a compatibility issue in mariadb https://mariadb.org/mariadb-dump-file-compatibility-change/
+        run: |
+          kubectl -n ${{ inputs.namespace }} exec ${{ steps.mariaPod.outputs.mariadbPod }} -- bash -c "zcat /dump.sql.gz | tail +2 | mysql --defaults-file=/root/.my.cnf.docker --binary-mode"
+          kubectl -n ${{ inputs.namespace }} exec ${{ steps.mariaPod.outputs.mariadbPod }} -- bash -c "rm /dump.sql.gz"
+      - name: Create default user
+        run: |
+          kubectl -n ${{ inputs.namespace }} exec ${{ steps.mariaPod.outputs.mariadbPod }} -- mysql --defaults-file=/root/.my.cnf.docker  -v -e "CREATE USER IF NOT EXISTS '${{ inputs.test-db-username }}'@'%' IDENTIFIED BY '${{ inputs.test-db-password }}'" ${{ inputs.rds-database }}
+          kubectl -n ${{ inputs.namespace }} exec ${{ steps.mariaPod.outputs.mariadbPod }} -- mysql --defaults-file=/root/.my.cnf.docker -v -e "GRANT ALL PRIVILEGES ON ${{ inputs.rds-database }}.* TO '${{ inputs.test-db-username }}'@'%'" ${{ inputs.rds-database }}
+          kubectl -n ${{ inputs.namespace }} exec ${{ steps.mariaPod.outputs.mariadbPod }} -- mysql --defaults-file=/root/.my.cnf.docker -v -e "FLUSH PRIVILEGES" ${{ inputs.rds-database }}
+      - name: Create volume snapshot file
+        run: |
+          echo 'apiVersion: snapshot.storage.k8s.io/v1'                                               > snapshot.yaml
+          echo 'kind: VolumeSnapshotClass'                                                           >> snapshot.yaml
+          echo 'metadata:'                                                                           >> snapshot.yaml
+          echo '  name: ebs'                                                                         >> snapshot.yaml
+          echo 'driver: ebs.csi.aws.com'                                                             >> snapshot.yaml
+          echo 'deletionPolicy: Retain'                                                              >> snapshot.yaml
+          echo 'parameters:'                                                                         >> snapshot.yaml
+          echo '  tagSpecification_1: "project=${{ inputs.project}}"'                                >> snapshot.yaml
+          echo '  tagSpecification_2: "purpose=scrambledb"'                                          >> snapshot.yaml
+          echo '---'                                                                                 >> snapshot.yaml
+          echo 'apiVersion: snapshot.storage.k8s.io/v1'                                              >> snapshot.yaml
+          echo 'kind: VolumeSnapshot'                                                                >> snapshot.yaml
+          echo 'metadata:'                                                                           >> snapshot.yaml
+          echo '  name: ${{ inputs.project }}-daily-snapshot'                                        >> snapshot.yaml
+          echo '  annotations:'                                                                      >> snapshot.yaml
+          echo '    mariadb/version: "${{ needs.create-snapshot.outputs.rds-engine-version }}"'      >> snapshot.yaml
+          echo 'spec:'                                                                               >> snapshot.yaml
+          echo '  volumeSnapshotClassName: ebs'                                                      >> snapshot.yaml
+          echo '  source:'                                                                           >> snapshot.yaml
+          echo '    persistentVolumeClaimName: ${{ inputs.namespace }}-mariadb-data'                 >> snapshot.yaml
+      - name: Create volume snapshot
+        run: |
+          kubectl -n ${{ inputs.namespace }} apply -f snapshot.yaml
+      - name: Wait snapshot ready
+        timeout-minutes: ${{ inputs.timeout-minutes-volume-snapshop-completion }}
+        run: |
+          while true; do
+          status=$(kubectl -n ${{ inputs.namespace }} get vs ${{ inputs.project }}-daily-snapshot -o json  | jq -r .status.readyToUse)
+          echo $status
+          if [ "$status" = "true" ]; then
+             break
+          fi
+          echo "Waiting for volume snapshot to be available"
+          sleep 10
+          done
+
+
+  clean-up-mariadb:
+    runs-on: ${{ inputs.runs-on }}
+    environment:
+      name: test
+    needs:
+      - create-db-volume-snapshot
+    continue-on-error: true
+    if: always()
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-session-name: scrambler-test
+          role-to-assume: "arn:aws:iam::${{ inputs.aws-account-id-test }}:role/github-actions-${{ inputs.project }}-test"
+          aws-region: eu-central-1
+      - name: Create kubeconfig
+        run: aws eks --region ${{ inputs.aws-region }} update-kubeconfig --name Emesa-Eks-Test-1
+      - name: Helm delete
+        run: helm delete --namespace ${{ inputs.namespace }} ${{ inputs.namespace }}
+      - name: Delete namespace
+        run: kubectl delete namespace ${{ inputs.namespace }}
+
+  clean-up-volume-snapshots:
+    runs-on: ${{ inputs.runs-on }}
+    environment:
+      name: test
+    needs:
+      - create-db-volume-snapshot
+    continue-on-error: true
+    if: always()
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-session-name: scrambler-test
+          role-to-assume: "arn:aws:iam::${{ inputs.aws-account-id-test }}:role/github-actions-${{ inputs.project }}-test"
+          aws-region: eu-central-1
+      - name: Create kubeconfig
+        run: aws eks --region ${{ inputs.aws-region }} update-kubeconfig --name Emesa-Eks-Test-1
+      - name: Cleanup volume snapshots
+        continue-on-error: true
+        run: |
+          for resource in $(kubectl -n ${{ inputs.namespace }} get vs --sort-by=.metadata.creationTimestamp -o name | tac | sed 1,${{ inputs.keep-max-snapshots }}d) ; 
+          do
+            echo -e "\033[31;1;4mRemoving $resource\033[0m"
+            kubectl -n ${{ inputs.namespace }} delete $resource || true; 
+          done
+      - name: Cleanup volume snapshots contents
+        continue-on-error: true
+        run: |
+          for resource in $(kubectl get vsc --sort-by=.metadata.creationTimestamp  -o json | jq -r '.items[] | select(.spec.volumeSnapshotRef.namespace=="${{ inputs.namespace }}" ) | .metadata.name' | tac | sed 1,${{ inputs.keep-max-snapshots }}d); 
+          do
+            echo -e "\033[31;1;4mRemoving $resource\033[0m"
+            kubectl delete vsc $resource || true ; 
+          done
+
+  clean-up-rds-instance:
+    runs-on: ${{ inputs.runs-on }}
+    environment:
+      name: test
+    needs:
+      - create-db-volume-snapshot
+    if: always()
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-session-name: scrambler-test
+          role-to-assume: "arn:aws:iam::${{ inputs.aws-account-id-test }}:role/github-actions-${{ inputs.project }}-test"
+          aws-region: eu-central-1
+      - name: Delete rds instance
+        continue-on-error: true
+        run: |
+          aws rds delete-db-instance \
+              --db-instance-identifier ${{ inputs.db-instance }}-scrambling \
+              --skip-final-snapshot
+
+  clean-up-rds-snapshot:
+    runs-on: ${{ inputs.runs-on }}
+    environment:
+      name: prod
+    needs:
+      - create-snapshot
+      - create-db-volume-snapshot
+    if: always()
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-session-name: scrambler-test
+          role-to-assume: "arn:aws:iam::${{ inputs.aws-account-id-prod }}:role/github-actions-${{ inputs.project }}-prod"
+          aws-region: eu-central-1
+      - name: Delete snapshot
+        continue-on-error: true
+        run: |
+          aws rds delete-db-snapshot \
+               --db-snapshot-identifier ${{needs.create-snapshot.outputs.rds-snapshot-id }}
